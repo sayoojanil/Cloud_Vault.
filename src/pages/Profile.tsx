@@ -176,10 +176,10 @@ export default function Profile() {
           <div className="vault-card p-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
               <div className="relative">
-                <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-3xl font-bold">
-                  {user?.name?.charAt(0).toUpperCase()}
+                {/* <div className="w-24 h-24 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-3xl font-bold"> */}
+                  {/* {user?.name} */}
                 </div>
-              </div>
+              {/* </div> */}
               
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">

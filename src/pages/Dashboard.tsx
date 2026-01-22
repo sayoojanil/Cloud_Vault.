@@ -28,6 +28,9 @@ import { DocumentCategory, CATEGORY_LABELS } from '@/types/vault';
 import { format, formatDistanceToNow, isAfter, addDays } from 'date-fns';
 import { CardSkeleton } from '@/components/ui/skeleton-custom';
 
+
+document.title="Dashboard";
+
 const categoryIcons: Record<DocumentCategory, React.ComponentType<{ className?: string }>> = {
   identity: User,
   financial: CreditCard,
@@ -45,7 +48,7 @@ export function VerifyBadge({ verified }: { verified?: boolean }) {
   return (
     <Badge
       variant="link"
-      className="gap-1 text-xs  border-none bg-blue-500 text-white"
+      className="gap-1 text-xs  border-none bg-green-500 text-white"
     >
       Encrypted
       <CircleCheck className="w-4 h-4" />

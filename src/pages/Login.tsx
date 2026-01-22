@@ -179,7 +179,7 @@ export default function Login() {
 
           <h1 className="text-2xl font-bold mb-2 text-center">Welcome back</h1>
           <p className="text-muted-foreground mb-8 text-center">
-            Sign in to access your secure vault
+            Sign in to access your documents.
           </p>
 
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, useRef } from 'react';
+import { useState,useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -125,12 +125,25 @@ export default function Documents() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [zoomImageSrc, setZoomImageSrc] = useState<string>('');
   const [zoomImageName, setZoomImageName] = useState<string>('');
+  const uploadBellRef = useRef<HTMLAudioElement | null>(null);
+
+
+  useEffect(() => {
+  uploadBellRef.current = new Audio('/bell.wav');
+}, []);
+
+
+
+  document.title="Documents";
 
   const handleToggleFavorite = (docId: string, isFavorite: boolean) => {
     toggleFavorite(docId);
 
+    const document = documents.find(doc => doc.id === docId);
+    const docName = document ? document.name : 'Document';
+
     toast.success( 
-      isFavorite ? "Removed from favorites" : "Added to favorites",
+      isFavorite ? `${docName} removed from favorites` : `${docName} added to favorites`,
       {
         description: isFavorite
           ? "This document is no longer starred."
@@ -138,6 +151,8 @@ export default function Documents() {
       }
     );
   };
+
+  
 
   const handleImageZoom = (imageSrc: string, imageName: string) => {
     setZoomImageSrc(imageSrc);
@@ -288,11 +303,17 @@ export default function Documents() {
         }
       }
 
+      
+
       // Update the loading toast with result
-      if (successfulUploads > 0 && failedUploads === 0) {
-        toast.success(`Successfully uploaded ${successfulUploads} file${successfulUploads > 1 ? 's' : ''}`, {
-          id: toastId,
-        });
+   if (successfulUploads > 0 && failedUploads === 0) {
+  uploadBellRef.current?.play().catch(() => {});
+  
+  toast.success(`Successfully uploaded ${successfulUploads} file${successfulUploads > 1 ? 's' : ''}`, {
+    id: toastId,
+  });
+
+
       } else if (successfulUploads > 0 && failedUploads > 0) {
         toast.warning(`Uploaded ${successfulUploads} file${successfulUploads > 1 ? 's' : ''}, ${failedUploads} failed`, {
           id: toastId,

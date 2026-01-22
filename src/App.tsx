@@ -6,6 +6,8 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { VaultProvider } from "@/contexts/VaultContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import RouteTitle from "@/components/RouteTitle";
+
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -27,43 +29,94 @@ const App = () => (
         <AuthProvider>
           <VaultProvider>
             <Routes>
-              <Route path="/" element={<Landing />} />
-              <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
-              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route
+                path="/"
+                element={
+                  <RouteTitle title="Cloud Vault">
+                    <Landing />
+                  </RouteTitle>
+                }
+              />
+
+              <Route
+                path="/login"
+                element={
+                  <RouteTitle title="Login ">
+                    <Login />
+                  </RouteTitle>
+                }
+              />
+
+              <Route
+                path="/signup"
+                element={
+                  <RouteTitle title="Signup ">
+                    <Signup />
+                  </RouteTitle>
+                }
+              />
+
+              <Route
+                path="/forgot-password"
+                element={
+                  <RouteTitle title="Forgot Password ">
+                    <ForgotPassword />
+                  </RouteTitle>
+                }
+              />
+
               <Route
                 path="/dashboard"
                 element={
                   <ProtectedRoute>
-                    <Dashboard />
+                    <RouteTitle title="Dashboard ">
+                      <Dashboard />
+                    </RouteTitle>
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/documents"
                 element={
                   <ProtectedRoute>
-                    <Documents />
+                    <RouteTitle title="All Documents  ">
+                      <Documents />
+                    </RouteTitle>
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/profile"
                 element={
                   <ProtectedRoute>
-                    <Profile />
+                    <RouteTitle title="Profile Page ">
+                      <Profile />
+                    </RouteTitle>
                   </ProtectedRoute>
                 }
               />
+
               <Route
                 path="/settings"
                 element={
                   <ProtectedRoute>
-                    <Settings />
+                    <RouteTitle title="Settings ">
+                      <Settings />
+                    </RouteTitle>
                   </ProtectedRoute>
                 }
               />
-              <Route path="*" element={<NotFound />} />
+
+              <Route
+                path="*"
+                element={
+                  <RouteTitle title="404 Not Found">
+                    <NotFound />
+                  </RouteTitle>
+                }
+              />
             </Routes>
           </VaultProvider>
         </AuthProvider>

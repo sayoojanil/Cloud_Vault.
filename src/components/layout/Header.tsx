@@ -126,7 +126,7 @@ export function Header() {
               ) : (
                 <>
                   {/* Search Bar */}
-                  <AnimatePresence>
+                  {/* <AnimatePresence>
                     {searchOpen ? (
                       <motion.form
                         initial={{ width: 0, opacity: 0 }}
@@ -167,7 +167,7 @@ export function Header() {
                         <Search className="w-4 h-4" />
                       </motion.button>
                     )}
-                  </AnimatePresence>
+                  </AnimatePresence> */}
 
                   {/* User Links */}
                   <motion.div
