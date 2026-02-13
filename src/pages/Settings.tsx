@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { 
   Bell, 
@@ -35,25 +35,65 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 
+type Theme = 'light' | 'dark' | 'system';
+
 export default function Settings() {
   const { logout } = useAuth();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   
+  // Get initial theme from localStorage or system preference
+  const getInitialTheme = (): Theme => {
+    if (typeof window === 'undefined') return 'system';
+    
+    const savedTheme = localStorage.getItem('theme') as Theme;
+    if (savedTheme && ['light', 'dark', 'system'].includes(savedTheme)) {
+      return savedTheme;
+    }
+    
+    return 'system';
+  };
+
   // Settings state
   const [settings, setSettings] = useState({
     emailNotifications: true,
     pushNotifications: false,
     expiryReminders: true,
     weeklyDigest: false,
-    theme: 'light',
+    theme: getInitialTheme(),
     language: 'en',
   });
 
+  // Apply theme effect
+  useEffect(() => {
+    applyTheme(settings.theme);
+  }, [settings.theme]);
 
+  const applyTheme = (theme: Theme) => {
+    const root = document.documentElement;
+    
+    // Remove existing theme classes
+    root.classList.remove('light', 'dark');
+    
+    if (theme === 'system') {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      root.classList.add(systemTheme);
+    } else {
+      root.classList.add(theme);
+    }
+    
+    // Save to localStorage
+    localStorage.setItem('theme', theme);
+  };
 
   const handleSettingChange = (key: string, value: boolean | string) => {
     setSettings(prev => ({ ...prev, [key]: value }));
-    toast.success('Settings updated');
+    
+    // Special handling for theme changes
+    if (key === 'theme') {
+      toast.success(`Theme changed to ${value}`);
+    } else {
+      toast.success('Settings updated');
+    }
   };
 
   const handleExportData = () => {
@@ -65,6 +105,20 @@ export default function Settings() {
     toast.success('Account deleted successfully');
     setShowDeleteDialog(false);
   };
+
+  // Listen for system theme changes when using system theme
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    
+    const handleSystemThemeChange = () => {
+      if (settings.theme === 'system') {
+        applyTheme('system');
+      }
+    };
+    
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+    return () => mediaQuery.removeEventListener('change', handleSystemThemeChange);
+  }, [settings.theme]);
 
   return (
     <div className="min-h-screen bg-vault-surface">
@@ -78,20 +132,20 @@ export default function Settings() {
           <h1 className="text-2xl font-bold mb-8">Settings</h1>
 
           {/* Notifications */}
-          {/* <div className="vault-card p-6 mb-6">
-            <div className="flex items-center gap-3 mb-6"> */}
-              {/* <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
+          <div className="vault-card p-6 mb-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
                 <Bell className="w-5 h-5" />
               </div>
               <div>
                 <h3 className="font-semibold">Notifications</h3>
                 <p className="text-sm text-muted-foreground">Manage how you receive updates</p>
-              </div> */}
-            {/* </div> */}
+              </div>
+            </div>
             
-            {/* <div className="space-y-4"> */}
-              {/* <div className="flex items-center justify-between py-3 border-b border-border"> */}
-                {/* <div className="flex items-center gap-3">
+            <div className="space-y-4">
+              <div className="flex items-center justify-between py-3 border-b border-border">
+                <div className="flex items-center gap-3">
                   <Mail className="w-4 h-4 text-muted-foreground" />
                   <div>
                     <Label>Email Notifications</Label>
@@ -101,11 +155,11 @@ export default function Settings() {
                 <Switch
                   checked={settings.emailNotifications}
                   onCheckedChange={(checked) => handleSettingChange('emailNotifications', checked)}
-                /> */}
-              {/* </div> */}
+                />
+              </div>
               
-              {/* < className="flex items-center justify-between py-3 border-b border-border"> */}
-                {/* <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between py-3 border-b border-border">
+                <div className="flex items-center gap-3">
                   <Smartphone className="w-4 h-4 text-muted-foreground" />
                   <div>
                     <Label>Push Notifications</Label>
@@ -115,10 +169,10 @@ export default function Settings() {
                 <Switch
                   checked={settings.pushNotifications}
                   onCheckedChange={(checked) => handleSettingChange('pushNotifications', checked)}
-                /> */}
+                />
+              </div>
               
-              
-              {/* <div className="flex items-center justify-between py-3 border-b border-border">
+              <div className="flex items-center justify-between py-3 border-b border-border">
                 <div className="flex items-center gap-3">
                   <Bell className="w-4 h-4 text-muted-foreground" />
                   <div>
@@ -130,10 +184,10 @@ export default function Settings() {
                   checked={settings.expiryReminders}
                   onCheckedChange={(checked) => handleSettingChange('expiryReminders', checked)}
                 />
-              </div> */}
+              </div>
               
-              {/* <div className="flex items-center justify-between py-3"> */}
-                {/* <div className="flex items-center gap-3">
+              <div className="flex items-center justify-between py-3">
+                <div className="flex items-center gap-3">
                   <Mail className="w-4 h-4 text-muted-foreground" />
                   <div>
                     <Label>Weekly Digest</Label>
@@ -143,10 +197,10 @@ export default function Settings() {
                 <Switch
                   checked={settings.weeklyDigest}
                   onCheckedChange={(checked) => handleSettingChange('weeklyDigest', checked)}
-                /> */}
-              {/* </div> */}
-            {/* </div>
-          </div> */}
+                />
+              </div>
+            </div>
+          </div>
 
           {/* Appearance */}
           <div className="vault-card p-6 mb-6">
@@ -165,8 +219,13 @@ export default function Settings() {
                 <div className="flex items-center gap-3">
                   {settings.theme === 'dark' ? (
                     <Moon className="w-4 h-4 text-muted-foreground" />
-                  ) : (
+                  ) : settings.theme === 'light' ? (
                     <Sun className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <div className="relative w-4 h-4">
+                      <Sun className="w-4 h-4 text-muted-foreground absolute opacity-50" />
+                      <Moon className="w-4 h-4 text-muted-foreground absolute opacity-50" />
+                    </div>
                   )}
                   <div>
                     <Label>Theme</Label>
@@ -175,15 +234,33 @@ export default function Settings() {
                 </div>
                 <Select
                   value={settings.theme}
-                  onValueChange={(value) => handleSettingChange('theme', value)}
+                  onValueChange={(value: Theme) => handleSettingChange('theme', value)}
                 >
                   <SelectTrigger className="w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="light">Light</SelectItem>
-                    <SelectItem value="dark">Dark</SelectItem>
-                    <SelectItem value="system">System</SelectItem>
+                    <SelectItem value="light">
+                      <div className="flex items-center gap-2">
+                        <Sun className="w-4 h-4" />
+                        Light
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="dark">
+                      <div className="flex items-center gap-2">
+                        <Moon className="w-4 h-4" />
+                        Dark
+                      </div>
+                    </SelectItem>
+                    <SelectItem value="system">
+                      <div className="flex items-center gap-2">
+                        <div className="relative w-4 h-4">
+                          <Sun className="w-4 h-4 absolute opacity-50" />
+                          <Moon className="w-4 h-4 absolute opacity-50" />
+                        </div>
+                        System
+                      </div>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -247,7 +324,7 @@ export default function Settings() {
           </div>
 
           {/* Data Management */}
-          {/* <div className="vault-card p-6">
+          <div className="vault-card p-6">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
                 <Download className="w-5 h-5" />
@@ -281,7 +358,7 @@ export default function Settings() {
                 </Button>
               </div>
             </div>
-          </div> */}
+          </div>
         </motion.div>
       </main>
 

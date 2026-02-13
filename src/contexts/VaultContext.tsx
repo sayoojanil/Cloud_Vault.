@@ -12,6 +12,59 @@ import {
   apiGetStats,
 } from '@/lib/api';
 import { toast } from 'sonner';
+import { PDFDocument } from 'pdf-lib';
+
+// Helper to load an image element from a File
+const loadImageFromFile = (file: File): Promise<HTMLImageElement> => {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = (e) => reject(e);
+    img.src = URL.createObjectURL(file);
+  });
+};
+
+// Convert an image File to a single-page PDF File using pdf-lib
+const convertImageFileToPdf = async (file: File): Promise<File> => {
+  // For JPEG, we can embed directly. For others, render to canvas and embed as PNG.
+  const isJpeg = /jpeg|jpg/.test(file.type);
+
+  let imageArrayBuffer: ArrayBuffer;
+
+  if (isJpeg) {
+    imageArrayBuffer = await file.arrayBuffer();
+  } else {
+    // Use canvas to normalize other image types (png, webp, gif) to PNG
+    const img = await loadImageFromFile(file);
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || img.width;
+    canvas.height = img.naturalHeight || img.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Cannot get canvas context');
+    ctx.drawImage(img, 0, 0);
+    const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+    if (!blob) throw new Error('Failed to convert image to PNG');
+    imageArrayBuffer = await blob.arrayBuffer();
+  }
+
+  const pdfDoc = await PDFDocument.create();
+
+  if (isJpeg) {
+    const jpgImage = await pdfDoc.embedJpg(imageArrayBuffer);
+    const page = pdfDoc.addPage([jpgImage.width, jpgImage.height]);
+    page.drawImage(jpgImage, { x: 0, y: 0, width: jpgImage.width, height: jpgImage.height });
+  } else {
+    const pngImage = await pdfDoc.embedPng(imageArrayBuffer);
+    const page = pdfDoc.addPage([pngImage.width, pngImage.height]);
+    page.drawImage(pngImage, { x: 0, y: 0, width: pngImage.width, height: pngImage.height });
+  }
+
+  const pdfBytes = await pdfDoc.save();
+  const pdfFile = new File([pdfBytes], (file.name || `Document`).replace(/\.[^/.]+$/, '') + '.pdf', {
+    type: 'application/pdf',
+  });
+  return pdfFile;
+};
 
 interface VaultContextType {
   documents: Document[];
@@ -191,12 +244,27 @@ export function VaultProvider({ children }: { children: React.ReactNode }) {
     // Ensure all required fields are provided
     const fileName = metadata?.name || file.name || `Document-${Date.now()}`;
     const category = metadata?.category || 'other';
-    const type = metadata?.type || (file.type === 'application/pdf' ? 'pdf' : 'image');
+    const requestedType = metadata?.type;
+    const inferredType = file.type === 'application/pdf' ? 'pdf' : 'image';
+    let type = requestedType || inferredType;
     const tags = metadata?.tags || [];
     const docMetadata = metadata?.metadata || {};
 
+    // If the uploaded file is an image, convert it to PDF client-side before uploading
+    let uploadFile: File = file;
     try {
-      const uploadedDoc = await apiUploadDocument(file, {
+      if (file.type && file.type.startsWith('image/') && type !== 'pdf') {
+        uploadFile = await convertImageFileToPdf(file);
+        type = 'pdf';
+      }
+    } catch (convError) {
+      console.error('Image to PDF conversion failed:', convError);
+      toast.error('Failed to convert image to PDF; uploading original file');
+      uploadFile = file;
+    }
+
+    try {
+      const uploadedDoc = await apiUploadDocument(uploadFile, {
         name: fileName,
         category: category,
         type: type,

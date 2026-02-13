@@ -522,7 +522,7 @@ export default function Documents() {
                   >
                     <div
                       className="aspect-[4/3] bg-vault-surface rounded-none flex items-center justify-center cursor-pointer overflow-hidden"
-                      onClick={() => { setSelectedDocument(doc); setShowPreviewDialog(true); }}
+                      onClick={() => openPdfInSameTab(doc.id)}
                     >
                       {doc.fileType === 'pdf' ? (
                         <FileIcon className="w-12 h-12 text-muted-foreground" />
@@ -530,13 +530,8 @@ export default function Documents() {
                         <img
                           src={doc.thumbnailUrl || doc.fileUrl}
                           alt={doc.name}
-                          className="w-full h-full object-cover cursor-zoom-in"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            if (doc.fileType !== 'pdf') {
-                              handleImageZoom(doc.thumbnailUrl || doc.fileUrl, doc.name);
-                            }
-                          }}
+                          className="w-full h-full object-cover cursor-pointer"
+                          onClick={() => openPdfInSameTab(doc.id)}
                         />
                       )}
                     </div>
@@ -635,7 +630,7 @@ export default function Documents() {
                 <div 
                   key={doc.id} 
                   className="flex items-center gap-4 p-4 hover:bg-vault-surface-hover transition-colors cursor-pointer"
-                  onClick={() => { setSelectedDocument(doc); setShowPreviewDialog(true); }}
+                  onClick={() => openPdfInSameTab(doc.id)}
                 >
                   <div className="w-10 h-10 rounded bg-secondary flex items-center justify-center flex-shrink-0">
                     <FileIcon className="w-5 h-5 text-muted-foreground" />
