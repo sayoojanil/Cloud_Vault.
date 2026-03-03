@@ -79,7 +79,7 @@ export default function Landing() {
             transition={{ duration: 0.6 }}
             className="text-center max-w-3xl mx-auto"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-green-500 text-white text-xs font-medium mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-black text-white text-xs font-medium mb-6">
               <Lock className="w-3.5 h-3.5" />
               <span>Best security for your personal documents</span>
             </div>
@@ -237,7 +237,7 @@ export default function Landing() {
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-500 text-white text-xs font-medium mb-6">
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500 text-white text-xs font-medium mb-6">
               <Shield className="w-4 h-4" />
               Bank-level security
             </div>
@@ -254,7 +254,7 @@ export default function Landing() {
             <div className="grid sm:grid-cols-2 gap-3">
               {securityFeatures.map((item, i) => (
                 <div key={i} className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
+                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
                     <Check className="w-3 h-3 text-primary-foreground" />
                   </div>
                   <span className="text-sm">{item}</span>
@@ -267,7 +267,7 @@ export default function Landing() {
             initial={{ opacity: 0, x: 30 }}
             whileInView={{ opacity: 1, x: 0 }}
             viewport={{ once: true }}
-            className="vault-card p-8 bg-primary text-primary-foreground"
+            className="vault-card p-8 bg-green-500 text-primary-foreground"
           >
             <Lock className="w-16 h-16 mb-6 opacity-80" />
             <h3 className="text-2xl font-bold mb-2">

@@ -7,7 +7,6 @@ import { AuthProvider } from "@/contexts/AuthContext";
 import { VaultProvider } from "@/contexts/VaultContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import RouteTitle from "@/components/RouteTitle";
-
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -64,6 +63,8 @@ const App = () => (
                   </RouteTitle>
                 }
               />
+
+              
 
               <Route
                 path="/dashboard"
