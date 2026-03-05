@@ -173,7 +173,7 @@ export default function Signup() {
               )}
             </div>
 
-            <Button type="submit" className="w-full gap-2 rounded-full" disabled={isLoading}>
+            <Button type="submit" className="w-full gap-2 rounded-md" disabled={isLoading}>
               {isLoading ? 'Creating account...' : 'Create Account'}
               <ArrowRight className="w-4 h-4" />
             </Button>

@@ -28,6 +28,10 @@ interface AuthContextType {
   loginAsGuest: () => void;
   updateUser: (userData: Partial<User>) => void;
   isAuthenticated: boolean;
+  // New password reset methods
+  forgotPassword: (email: string) => Promise<boolean>;
+  verifyOTP: (email: string, otp: string) => Promise<boolean>;
+  resetPassword: (email: string, otp: string, newPassword: string) => Promise<boolean>;
 }
 
 /* ---------------------------------------------
@@ -42,6 +46,9 @@ const API_BASE = import.meta.env.VITE_API_URL || "https://backend-digilocker-4.o
 
 const LOGIN_URL = `${API_BASE}/loginWithEmail`;
 const SIGNUP_URL = `${API_BASE}/auth/signup`;
+const FORGOT_PASSWORD_URL = `${API_BASE}/forgot-password`;
+const VERIFY_OTP_URL = `${API_BASE}/verify-otp`;
+const RESET_PASSWORD_URL = `${API_BASE}/reset-password`;
 
 /* ---------------------------------------------
    Guest User
@@ -50,8 +57,9 @@ const GUEST_USER: User = {
   id: "guest",
   name: "Guest User",
   email: "guest@vault.app",
+  phone: "",
   storageUsed: 0,
-  storageLimit: 100 * 1024 * 1024,
+  storageLimit: 100 * 1024 * 1024, // 100MB
   isGuest: true,
 };
 
@@ -115,7 +123,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return true;
       } catch (err: any) {
         console.error("Login failed:", err);
-        throw err; // Re-throw to let the UI handle it
+        throw err;
       } finally {
         setIsLoading(false);
       }
@@ -158,7 +166,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return true;
       } catch (err: any) {
         console.error("Signup failed:", err);
-        throw err; // Re-throw to let the UI handle it
+        throw err;
       } finally {
         setIsLoading(false);
       }
@@ -196,6 +204,94 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [user]);
 
   /* ---------------------------------------------
+     FORGOT PASSWORD - Request OTP
+  --------------------------------------------- */
+  const forgotPassword = useCallback(async (email: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      
+      const res = await fetch(FORGOT_PASSWORD_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to send OTP');
+      }
+
+      return true;
+    } catch (err: any) {
+      console.error('Forgot password failed:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /* ---------------------------------------------
+     VERIFY OTP
+  --------------------------------------------- */
+  const verifyOTP = useCallback(async (email: string, otp: string): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      
+      const res = await fetch(VERIFY_OTP_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to verify OTP');
+      }
+
+      return true;
+    } catch (err: any) {
+      console.error('OTP verification failed:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /* ---------------------------------------------
+     RESET PASSWORD
+  --------------------------------------------- */
+  const resetPassword = useCallback(async (
+    email: string, 
+    otp: string, 
+    newPassword: string
+  ): Promise<boolean> => {
+    try {
+      setIsLoading(true);
+      
+      const res = await fetch(RESET_PASSWORD_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, otp, newPassword }),
+      });
+
+      const data = await res.json();
+      
+      if (!res.ok) {
+        throw new Error(data.message || 'Failed to reset password');
+      }
+
+      return true;
+    } catch (err: any) {
+      console.error('Reset password failed:', err);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  /* ---------------------------------------------
      Context Value
   --------------------------------------------- */
   const value: AuthContextType = {
@@ -207,6 +303,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     loginAsGuest,
     updateUser,
     isAuthenticated: !!user && !user.isGuest,
+    // New password reset methods
+    forgotPassword,
+    verifyOTP,
+    resetPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

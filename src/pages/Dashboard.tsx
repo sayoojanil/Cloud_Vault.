@@ -16,7 +16,10 @@ import {
   File,
   User,
   CircleCheck,
-  Archive
+  Archive,
+  StickyNote,
+  Plus,
+  Calendar
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -27,7 +30,16 @@ import { useVault } from '@/contexts/VaultContext';
 import { DocumentCategory, CATEGORY_LABELS } from '@/types/vault';
 import { format, formatDistanceToNow, isAfter, addDays } from 'date-fns';
 import { CardSkeleton } from '@/components/ui/skeleton-custom';
-
+import { useState } from 'react';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
 
 document.title="Dashboard";
 
@@ -42,13 +54,22 @@ const categoryIcons: Record<DocumentCategory, React.ComponentType<{ className?: 
   other: File,
 };
 
+// Note interface
+interface Note {
+  id: string;
+  title: string;
+  content: string;
+  date: Date;
+  color?: string;
+}
+
 export function VerifyBadge({ verified }: { verified?: boolean }) {
   if (!verified) return null;
 
   return (
     <Badge
       variant="link"
-      className="gap-1 text-xs  border-none bg-green-500 text-white"
+      className="gap-1 text-xs border-none bg-green-500 text-white"
     >
       Encrypted
       <CircleCheck className="w-4 h-4" />
@@ -59,6 +80,53 @@ export function VerifyBadge({ verified }: { verified?: boolean }) {
 export default function Dashboard() {
   const { user } = useAuth();
   const { documents, activities, stats, isLoading } = useVault();
+  const [notes, setNotes] = useState<Note[]>(() => {
+    // Load notes from localStorage
+    const savedNotes = localStorage.getItem('dashboard-notes');
+    return savedNotes ? JSON.parse(savedNotes).map((note: any) => ({
+      ...note,
+      date: new Date(note.date)
+    })) : [];
+  });
+  const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
+  const [newNote, setNewNote] = useState({ title: '', content: '' });
+
+  // Save notes to localStorage
+  const saveNotes = (updatedNotes: Note[]) => {
+    setNotes(updatedNotes);
+    localStorage.setItem('dashboard-notes', JSON.stringify(updatedNotes));
+  };
+
+  const handleAddNote = () => {
+    if (newNote.title.trim() && newNote.content.trim()) {
+      const note: Note = {
+        id: Date.now().toString(),
+        title: newNote.title,
+        content: newNote.content,
+        date: new Date(),
+        color: getRandomColor()
+      };
+      saveNotes([note, ...notes]);
+      setNewNote({ title: '', content: '' });
+      setIsNoteDialogOpen(false);
+    }
+  };
+
+  const handleDeleteNote = (id: string) => {
+    saveNotes(notes.filter(note => note.id !== id));
+  };
+
+  const getRandomColor = () => {
+    const colors = [
+      'bg-yellow-100 dark:bg-yellow-900/30',
+      'bg-blue-100 dark:bg-blue-900/30',
+      'bg-green-100 dark:bg-green-900/30',
+      'bg-purple-100 dark:bg-purple-900/30',
+      'bg-pink-100 dark:bg-pink-900/30',
+      'bg-orange-100 dark:bg-orange-900/30',
+    ];
+    return colors[Math.floor(Math.random() * colors.length)];
+  };
 
   // Calculate category counts from documents
   const getCategoryCounts = () => {
@@ -157,7 +225,7 @@ export default function Dashboard() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 mb-8"
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-8"
         >
           <Link to="/documents?action=upload" className="vault-card-hover p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
@@ -192,18 +260,45 @@ export default function Dashboard() {
             </div>
           </Link>
 
-          {/* <Link to="/documents?filter=archived" className="vault-card-hover p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
-              <Archive className="w-5 h-5 text-secondary-foreground" />
-            </div>
-            <div>
-              <p className="font-medium">Archived</p>
-              <p className="text-xs text-muted-foreground">{archivedDocuments.length} document{archivedDocuments.length !== 1 ? 's' : ''}</p>
-            </div>
-          </Link> */}
+          {/* Add Note Quick Action */}
+          <Dialog open={isNoteDialogOpen} onOpenChange={setIsNoteDialogOpen}>
+            <DialogTrigger asChild>
+              <button className="vault-card-hover p-4 flex items-center gap-3 text-left">
+                <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
+                  <StickyNote className="w-5 h-5 text-secondary-foreground" />
+                </div>
+                <div>
+                  <p className="font-medium">Add Note</p>
+                  <p className="text-xs text-muted-foreground">Quick thoughts</p>
+                </div>
+              </button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add a New Note</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 pt-4">
+                <Input
+                  placeholder="Note title"
+                  value={newNote.title}
+                  onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
+                />
+                <Textarea
+                  placeholder="Write your note here..."
+                  value={newNote.content}
+                  onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
+                  rows={5}
+                />
+                <Button onClick={handleAddNote} className="w-full">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Note
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </motion.div>
 
-        {/* Storage Info Card - Moved to separate row for better layout */}
+        {/* Storage Info Card */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -265,66 +360,163 @@ export default function Dashboard() {
             </div>
           </motion.div>
 
-          {/* Expiring Soon Section - Re-added with updated content */}
+          {/* Notes Section */}
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.25 }}
           >
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold">Expiring Soon</h2>
-              <Link to="/documents?filter=expiring" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
-                View all <ArrowUpRight className="w-3.5 h-3.5" />
-              </Link>
+              <div className="flex items-center gap-2">
+                <StickyNote className="w-4 h-4 text-muted-foreground" />
+                <h2 className="font-semibold">Quick Notes</h2>
+                {notes.length > 0 && (
+                  <Badge variant="outline">{notes.length}</Badge>
+                )}
+              </div>
+              <Dialog open={isNoteDialogOpen} onOpenChange={setIsNoteDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="ghost" size="sm" className="gap-1">
+                    <Plus className="w-3 h-3" />
+                    Add Note
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Add a New Note</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 pt-4">
+                    <Input
+                      placeholder="Note title"
+                      value={newNote.title}
+                      onChange={(e) => setNewNote({ ...newNote, title: e.target.value })}
+                    />
+                    <Textarea
+                      placeholder="Write your note here..."
+                      value={newNote.content}
+                      onChange={(e) => setNewNote({ ...newNote, content: e.target.value })}
+                      rows={5}
+                    />
+                    <Button onClick={handleAddNote} className="w-full">
+                      Add Note
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
-            <div className="vault-card">
-              {expiringDocuments.length === 0 ? (
-                <div className="p-6 text-center">
-                  <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-                  <p className="text-sm text-muted-foreground">No expiring documents</p>
+
+            <div className="space-y-3">
+              {notes.length === 0 ? (
+                <div className="vault-card p-6 text-center">
+                  <StickyNote className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground mb-3">No notes yet</p>
+                  <Dialog open={isNoteDialogOpen} onOpenChange={setIsNoteDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button size="sm">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create your first note
+                      </Button>
+                    </DialogTrigger>
+                  </Dialog>
                 </div>
               ) : (
-                <div className="divide-y divide-border">
-                  {expiringDocuments.slice(0, 3).map((doc) => {
-                    const CategoryIcon = categoryIcons[doc.category];
-                    const expiryDate = new Date(doc.metadata.expiryDate!);
-                    const daysUntilExpiry = Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-                    
-                    return (
-                      <Link
-                        key={doc.id}
-                        to={`/documents?id=${doc.id}`}
-                        className="p-3 flex items-center justify-between hover:bg-vault-surface-hover transition-colors"
+                notes.slice(0, 3).map((note) => (
+                  <motion.div
+                    key={note.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`vault-card p-4 ${note.color}`}
+                  >
+                    <div className="flex items-start justify-between mb-2">
+                      <h3 className="font-medium text-sm">{note.title}</h3>
+                      <button
+                        onClick={() => handleDeleteNote(note.id)}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded bg-secondary flex items-center justify-center">
-                            <CategoryIcon className="w-5 h-5 text-muted-foreground" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-medium truncate max-w-[150px]">{doc.name}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Expires {format(expiryDate, 'MMM d, yyyy')}
-                            </p>
-                          </div>
-                        </div>
-                        <Badge variant={daysUntilExpiry <= 30 ? "destructive" : "outline"}>
-                          {daysUntilExpiry <= 0 ? 'Expired' : `${daysUntilExpiry}d`}
-                        </Badge>
-                      </Link>
-                    );
-                  })}
-                  {expiringDocuments.length > 3 && (
-                    <div className="p-3 text-center">
-                      <Link to="/documents?filter=expiring" className="text-sm text-muted-foreground hover:text-foreground">
-                        +{expiringDocuments.length - 3} more expiring
-                      </Link>
+                        ×
+                      </button>
                     </div>
-                  )}
-                </div>
+                    <p className="text-sm text-muted-foreground mb-3 line-clamp-3">
+                      {note.content}
+                    </p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Calendar className="w-3 h-3" />
+                      {format(note.date, 'MMM d, yyyy')}
+                      <span>•</span>
+                      {formatDistanceToNow(note.date, { addSuffix: true })}
+                    </div>
+                  </motion.div>
+                ))
+              )}
+              {notes.length > 3 && (
+                <Button variant="ghost" className="w-full text-sm text-muted-foreground">
+                  View all {notes.length} notes
+                </Button>
               )}
             </div>
           </motion.div>
         </div>
+
+        {/* Expiring Soon Section */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mt-6"
+        >
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="font-semibold">Expiring Soon</h2>
+            <Link to="/documents?filter=expiring" className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1">
+              View all <ArrowUpRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="vault-card">
+            {expiringDocuments.length === 0 ? (
+              <div className="p-6 text-center">
+                <FileText className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">No expiring documents</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-border">
+                {expiringDocuments.slice(0, 3).map((doc) => {
+                  const CategoryIcon = categoryIcons[doc.category];
+                  const expiryDate = new Date(doc.metadata.expiryDate!);
+                  const daysUntilExpiry = Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+                  
+                  return (
+                    <Link
+                      key={doc.id}
+                      to={`/documents?id=${doc.id}`}
+                      className="p-3 flex items-center justify-between hover:bg-vault-surface-hover transition-colors"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded bg-secondary flex items-center justify-center">
+                          <CategoryIcon className="w-5 h-5 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-medium truncate max-w-[150px]">{doc.name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            Expires {format(expiryDate, 'MMM d, yyyy')}
+                          </p>
+                        </div>
+                      </div>
+                      <Badge variant={daysUntilExpiry <= 30 ? "destructive" : "outline"}>
+                        {daysUntilExpiry <= 0 ? 'Expired' : `${daysUntilExpiry}d`}
+                      </Badge>
+                    </Link>
+                  );
+                })}
+                {expiringDocuments.length > 3 && (
+                  <div className="p-3 text-center">
+                    <Link to="/documents?filter=expiring" className="text-sm text-muted-foreground hover:text-foreground">
+                      +{expiringDocuments.length - 3} more expiring
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </motion.div>
 
         {/* Archived Documents Section */}
         {archivedDocuments.length > 0 && (

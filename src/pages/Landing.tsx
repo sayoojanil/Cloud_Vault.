@@ -63,8 +63,65 @@ const itemVariants = {
   },
 };
 
+// Text animation variants
+const textVariants = {
+  hidden: { opacity: 0, y: 30 },
+  visible: (custom = 0) => ({
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.6,
+      delay: custom * 0.1,
+      ease: [0.25, 0.1, 0.25, 1],
+    },
+  }),
+};
+
+const letterVariants = {
+  hidden: { opacity: 0, y: 50 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.4, ease: [0.2, 0.65, 0.3, 0.9] },
+  },
+};
+
+const wordVariants = {
+  hidden: { opacity: 0 },
+  visible: {
+    opacity: 1,
+    transition: { staggerChildren: 0.03, delayChildren: 0.04 },
+  },
+};
+
 export default function Landing() {
   const { isAuthenticated } = useAuth();
+
+  // Function to split text into characters for animation
+  const splitText = (text) => {
+    return text.split('').map((char, index) => (
+      <motion.span
+        key={index}
+        variants={letterVariants}
+        style={{ display: 'inline-block' }}
+      >
+        {char === ' ' ? '\u00A0' : char}
+      </motion.span>
+    ));
+  };
+
+  // Function to split text into words for animation
+  const splitWords = (text) => {
+    return text.split(' ').map((word, index) => (
+      <motion.span
+        key={index}
+        variants={letterVariants}
+        style={{ display: 'inline-block', marginRight: '0.25rem' }}
+      >
+        {word}
+      </motion.span>
+    ));
+  };
 
   return (
     <div className="min-h-screen bg-background overflow-x-hidden">
@@ -74,62 +131,116 @@ export default function Landing() {
       <section className="pt-24 md:pt-32 pb-12 md:pb-20 px-4 sm:px-6">
         <div className="max-w-7xl mx-auto">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6 }}
+            initial="hidden"
+            animate="visible"
+            variants={wordVariants}
             className="text-center max-w-3xl mx-auto"
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-black text-white text-xs font-medium mb-6">
+            <motion.div
+              variants={itemVariants}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-border bg-black text-white text-xs font-medium mb-6"
+            >
               <Lock className="w-3.5 h-3.5" />
               <span>Best security for your personal documents</span>
-            </div>
+            </motion.div>
 
-            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6">
-              Your personal data,
+            <motion.h1 
+              variants={itemVariants}
+              className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight mb-6"
+            >
+              <motion.span variants={itemVariants} className="inline-block">
+                Your personal data,
+              </motion.span>
               <br />
-              <span className="text-muted-foreground">
+              <motion.span 
+                variants={itemVariants}
+                className="text-muted-foreground inline-block"
+              >
                 protected forever.
-              </span>
-            </h1>
+              </motion.span>
+            </motion.h1>
 
-            <p className="text-base md:text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
-              Securely store and manage your most important documents.
-              Passports, licenses, insurance cards, and more — all encrypted and
-              always accessible.
-            </p>
+            <motion.p
+              variants={itemVariants}
+              className="text-base md:text-lg text-muted-foreground mb-8 max-w-xl mx-auto"
+            >
+              {splitWords("Securely store and manage your most important documents. Passports, licenses, insurance cards, and more — all encrypted and always accessible.")}
+            </motion.p>
 
             {!isAuthenticated ? (
-              <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <motion.div 
+                variants={itemVariants}
+                className="flex flex-col sm:flex-row justify-center gap-4"
+              >
                 <Link to="/signup">
                   <Button size="lg" className="gap-2 px-8">
-                    Create your account
-                    <ArrowRight className="w-4 h-4" />
+                    <motion.span
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.8, duration: 0.3 }}
+                    >
+                      Create your account
+                    </motion.span>
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.9, duration: 0.3 }}
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </motion.div>
                   </Button>
                 </Link>
                 <Link to="/login">
                   <Button variant="outline" size="lg">
-                    Sign In
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 1.0, duration: 0.3 }}
+                    >
+                      Sign In
+                    </motion.span>
                   </Button>
                 </Link>
-              </div>
+              </motion.div>
             ) : (
-              <div className="flex flex-col sm:flex-row justify-center gap-4">
+              <motion.div 
+                variants={itemVariants}
+                className="flex flex-col sm:flex-row justify-center gap-4"
+              >
                 <Link to="/dashboard">
-                  <Button  size="lg" className="gap-2 px-8 rounded-full">
-                    Go to Dashboard
-                    <ArrowRight className="w-4 h-4" />
+                  <Button size="lg" className="gap-2 px-8 rounded-full">
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 0.8, duration: 0.3 }}
+                    >
+                      Go to Dashboard
+                    </motion.span>
+                    <motion.div
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.9, duration: 0.3 }}
+                    >
+                      <ArrowRight className="w-4 h-4" />
+                    </motion.div>
                   </Button>
                 </Link>
                 <Link to="/documents">
                   <Button className='rounded-full' variant="outline" size="lg">
-                    View Documents
+                    <motion.span
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ delay: 1.0, duration: 0.3 }}
+                    >
+                      View Documents
+                    </motion.span>
                   </Button>
                 </Link>
-              </div>
+              </motion.div>
             )}
           </motion.div>
 
-          {/* Hero Visual (REAL INFO – NO SKELETON) */}
+          {/* Hero Visual */}
           <motion.div
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
@@ -137,39 +248,45 @@ export default function Landing() {
             className="mt-16 max-w-4xl mx-auto"
           >
             <div className="vault-card p-4 shadow-vault-xl">
-              <div className=" bg-vault-surface rounded-md flex items-center justify-center">
+              <div className="bg-vault-surface rounded-md flex items-center justify-center">
                 <div className="w-full h-full p-6 md:p-10 grid grid-cols-1 sm:grid-cols-3 gap-4">
-
-                  <div className="vault-card p-5 text-center">
-                    <Lock className="w-10 h-10 mx-auto mb-3 text-primary" />
-                    <h4 className="font-semibold mb-1">
-                      Encrypted Storage
-                    </h4>
-                    <p className="text-xs text-muted-foreground">
-                      Military-grade AES-256 encryption for all files.
-                    </p>
-                  </div>
-
-                  <div className="vault-card p-5 text-center">
-                    <Fingerprint className="w-10 h-10 mx-auto mb-3 text-primary" />
-                    <h4 className="font-semibold mb-1">
-                      Private Access
-                    </h4>
-                    <p className="text-xs text-muted-foreground">
-                      Zero-knowledge security — only you can view documents.
-                    </p>
-                  </div>
-
-                  <div className="vault-card p-5 text-center">
-                    <Cloud className="w-10 h-10 mx-auto mb-3 text-primary" />
-                    <h4 className="font-semibold mb-1">
-                      Cloud Sync
-                    </h4>
-                    <p className="text-xs text-muted-foreground">
-                      Secure access across devices anytime.
-                    </p>
-                  </div>
-
+                  {[
+                    { icon: Lock, title: 'Encrypted Storage', desc: 'Military-grade AES-256 encryption for all files.' },
+                    { icon: Fingerprint, title: 'Private Access', desc: 'Zero-knowledge security — only you can view documents.' },
+                    { icon: Cloud, title: 'Cloud Sync', desc: 'Secure access across devices anytime.' }
+                  ].map((item, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.4 + index * 0.1, duration: 0.5 }}
+                      className="vault-card p-5 text-center"
+                    >
+                      <motion.div
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ delay: 0.6 + index * 0.1, duration: 0.4, type: "spring" }}
+                      >
+                        <item.icon className="w-10 h-10 mx-auto mb-3 text-primary" />
+                      </motion.div>
+                      <motion.h4
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.7 + index * 0.1, duration: 0.3 }}
+                        className="font-semibold mb-1"
+                      >
+                        {item.title}
+                      </motion.h4>
+                      <motion.p
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        transition={{ delay: 0.8 + index * 0.1, duration: 0.3 }}
+                        className="text-xs text-muted-foreground"
+                      >
+                        {item.desc}
+                      </motion.p>
+                    </motion.div>
+                  ))}
                 </div>
               </div>
             </div>
@@ -183,7 +300,7 @@ export default function Landing() {
           <motion.div
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: "-100px" }}
             variants={containerVariants}
             className="text-center mb-16"
           >
@@ -191,13 +308,13 @@ export default function Landing() {
               variants={itemVariants}
               className="text-3xl font-bold mb-4"
             >
-              Everything you need to stay organized
+              {splitText("Everything you need to stay organized")}
             </motion.h2>
             <motion.p
               variants={itemVariants}
               className="text-muted-foreground max-w-xl mx-auto"
             >
-              A complete solution for managing personal documents securely.
+              {splitWords("A complete solution for managing personal documents securely.")}
             </motion.p>
           </motion.div>
 
@@ -205,24 +322,52 @@ export default function Landing() {
             variants={containerVariants}
             initial="hidden"
             whileInView="visible"
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: "-50px" }}
             className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6"
           >
             {features.map((feature, index) => (
               <motion.div
                 key={index}
                 variants={itemVariants}
-                className="vault-card-hover p-6"
+                custom={index}
+                whileHover={{ 
+                  y: -8,
+                  transition: { duration: 0.3 }
+                }}
+                className="vault-card-hover p-6 cursor-pointer"
               >
-                <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-4">
+                <motion.div
+                  initial={{ scale: 0, rotate: -180 }}
+                  whileInView={{ scale: 1, rotate: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ 
+                    delay: index * 0.1,
+                    type: "spring",
+                    stiffness: 200,
+                    damping: 15
+                  }}
+                  className="w-12 h-12 rounded-full bg-primary flex items-center justify-center mb-4"
+                >
                   <feature.icon className="w-6 h-6 text-primary-foreground" />
-                </div>
-                <h3 className="font-semibold text-lg mb-2">
+                </motion.div>
+                <motion.h3
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2 + index * 0.1, duration: 0.4 }}
+                  className="font-semibold text-lg mb-2"
+                >
                   {feature.title}
-                </h3>
-                <p className="text-muted-foreground text-sm">
+                </motion.h3>
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  whileInView={{ opacity: 1 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.3 + index * 0.1, duration: 0.4 }}
+                  className="text-muted-foreground text-sm"
+                >
                   {feature.description}
-                </p>
+                </motion.p>
               </motion.div>
             ))}
           </motion.div>
@@ -235,47 +380,128 @@ export default function Landing() {
           <motion.div
             initial={{ opacity: 0, x: -30 }}
             whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.6 }}
           >
-            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500 text-white text-xs font-medium mb-6">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.8 }}
+              whileInView={{ opacity: 1, scale: 1 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4, delay: 0.1 }}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-500 text-white text-xs font-medium mb-6"
+            >
               <Shield className="w-4 h-4" />
               Bank-level security
-            </div>
+            </motion.div>
 
-            <h2 className="text-3xl font-bold mb-4">
-              Your security is our priority
-            </h2>
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="text-3xl font-bold mb-4"
+            >
+              {splitText("Your security is our priority")}
+            </motion.h2>
 
-            <p className="text-muted-foreground mb-8">
-              We use the same standards trusted by financial institutions.
-              Your documents are encrypted, backed up, and fully private.
-            </p>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+              className="text-muted-foreground mb-8"
+            >
+              {splitWords("We use the same standards trusted by financial institutions. Your documents are encrypted, backed up, and fully private.")}
+            </motion.p>
 
-            <div className="grid sm:grid-cols-2 gap-3">
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true }}
+              variants={containerVariants}
+              className="grid sm:grid-cols-2 gap-3"
+            >
               {securityFeatures.map((item, i) => (
-                <div key={i} className="flex items-center gap-2">
-                  <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center">
+                <motion.div
+                  key={i}
+                  variants={itemVariants}
+                  custom={i}
+                  className="flex items-center gap-2"
+                >
+                  <motion.div
+                    initial={{ scale: 0 }}
+                    whileInView={{ scale: 1 }}
+                    viewport={{ once: true }}
+                    transition={{ 
+                      delay: 0.4 + i * 0.05,
+                      type: "spring",
+                      stiffness: 300,
+                      damping: 15
+                    }}
+                    className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center"
+                  >
                     <Check className="w-3 h-3 text-primary-foreground" />
-                  </div>
-                  <span className="text-sm">{item}</span>
-                </div>
+                  </motion.div>
+                  <motion.span
+                    initial={{ opacity: 0, x: -10 }}
+                    whileInView={{ opacity: 1, x: 0 }}
+                    viewport={{ once: true }}
+                    transition={{ delay: 0.45 + i * 0.05, duration: 0.3 }}
+                    className="text-sm"
+                  >
+                    {item}
+                  </motion.span>
+                </motion.div>
               ))}
-            </div>
+            </motion.div>
           </motion.div>
 
           <motion.div
-            initial={{ opacity: 0, x: 30 }}
-            whileInView={{ opacity: 1, x: 0 }}
+            initial={{ opacity: 0, x: 30, rotateY: -15 }}
+            whileInView={{ opacity: 1, x: 0, rotateY: 0 }}
             viewport={{ once: true }}
-            className="vault-card p-8 bg-green-500 text-primary-foreground"
+            transition={{ 
+              duration: 0.8,
+              type: "spring",
+              stiffness: 100
+            }}
+            whileHover={{ 
+              scale: 1.02,
+              boxShadow: "0 20px 40px rgba(0,0,0,0.1)",
+              transition: { duration: 0.3 }
+            }}
+            className="vault-card p-8 bg-green-500 text-primary-foreground cursor-pointer"
           >
-            <Lock className="w-16 h-16 mb-6 opacity-80" />
-            <h3 className="text-2xl font-bold mb-2">
+            <motion.div
+              animate={{ 
+                rotate: [0, -10, 10, -5, 5, 0],
+              }}
+              transition={{ 
+                duration: 1,
+                delay: 0.5,
+                ease: "easeInOut"
+              }}
+            >
+              <Lock className="w-16 h-16 mb-6 opacity-80" />
+            </motion.div>
+            <motion.h3
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2, duration: 0.5 }}
+              className="text-2xl font-bold mb-2"
+            >
               Zero-Knowledge Architecture
-            </h3>
-            <p className="opacity-80">
+            </motion.h3>
+            <motion.p
+              initial={{ opacity: 0 }}
+              whileInView={{ opacity: 1 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.3, duration: 0.5 }}
+              className="opacity-80"
+            >
               Even our team cannot access your documents. Privacy by design.
-            </p>
+            </motion.p>
           </motion.div>
         </div>
       </section>

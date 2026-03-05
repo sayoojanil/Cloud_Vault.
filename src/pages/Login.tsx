@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Logo } from '@/components/ui/Logo';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { ForgotPasswordModal } from '@/components/ForgotPasswordModal';
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -26,6 +27,7 @@ export default function Login() {
   const [loginPhase, setLoginPhase] = useState<'idle' | 'loading' | 'success'>('idle');
   const [signInText, setSignInText] = useState('Sign In');
   const [progress, setProgress] = useState(0);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const { login, loginAsGuest } = useAuth();
   const navigate = useNavigate();
   const progressInterval = useRef<NodeJS.Timeout>();
@@ -93,7 +95,6 @@ export default function Login() {
       'Verifying credentials...',
       'Checking security...',
       'Finalizing...',
-      // 'Welcome back!'
     ];
     
     let index = 0;
@@ -164,222 +165,280 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex">
-      {/* Left Panel - Form */}
-      <div className="flex-1 flex items-center justify-center p-8">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="w-full max-w-sm"
-        >
-          <Link to="/" className="inline-block mb-8 ml-28">
-            <Logo />
-          </Link>
+    <>
+      <div className="min-h-screen flex">
+        {/* Left Panel - Form */}
+        <div className="flex-1 flex items-center justify-center p-8">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
+            className="w-full max-w-sm"
+          >
+            <Link to="/" className="inline-block mb-8 ml-28">
+              <Logo />
+            </Link>
 
-          <h1 className="text-2xl font-bold mb-2 text-center">Welcome back</h1>
-          <p className="text-muted-foreground mb-8 text-center">
-            Sign in to access your documents.
-          </p>
+            <h1 className="text-2xl font-bold mb-2 text-center">Welcome back</h1>
+            <p className="text-muted-foreground mb-8 text-center">
+              Sign in to access your documents.
+            </p>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"  
-                type="email"
-                placeholder="you@example.com"
-                className="mt-1.5 rounded-none"
-                {...register('email')}
-              />
-              {errors.email && (
-                <p className="text-destructive text-xs mt-1">{errors.email.message}</p>
-              )}
-            </div>
-
-            <div>
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password">Password</Label>
-              </div>
-              <div className="relative mt-1.5">
-                <Input className='rounded-none'
-                  id="password"
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="••••••••"
-                  {...register('password')}
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+              <div>
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"  
+                  type="email"
+                  placeholder="you@example.com"
+                  className="mt-1.5 rounded-none"
+                  {...register('email')}
                 />
+                {errors.email && (
+                  <p className="text-destructive text-xs mt-1">{errors.email.message}</p>
+                )}
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="password">Password</Label>
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotPassword(true)}
+                    className="text-sm text-primary hover:underline transition-colors"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+                <div className="relative mt-1.5">
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="••••••••"
+                    className="rounded-none pr-10"
+                    {...register('password')}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                {errors.password && (
+                  <p className="text-destructive text-xs mt-1">{errors.password.message}</p>
+                )}
+              </div>
+
+              {/* Remember Me Checkbox */}
+              <div className="flex items-center space-x-2">
                 <button
                   type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  onClick={() => setRememberMe(!rememberMe)}
+                  className="relative flex items-center justify-center w-4 h-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
+                  aria-checked={rememberMe}
+                  role="checkbox"
                 >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  {rememberMe && (
+                    <Check className="w-3 h-3 text-primary" />
+                  )}
                 </button>
+                <Label 
+                  htmlFor="remember-me" 
+                  className="text-sm font-normal cursor-pointer select-none"
+                  onClick={() => setRememberMe(!rememberMe)}
+                >
+                  Remember me
+                </Label>
               </div>
-              {errors.password && (
-                <p className="text-destructive text-xs mt-1">{errors.password.message}</p>
-              )}
-            </div>
 
-            {/* Remember Me Checkbox */}
-            <div className="flex items-center space-x-2">
-              <button
-                type="button"
-                onClick={() => setRememberMe(!rememberMe)}
-                className="relative flex items-center justify-center w-4 h-4 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                aria-checked={rememberMe}
-                role="checkbox"
+              {/* Enhanced Sign In Button */}
+              <Button 
+                type="submit" 
+                className="w-full gap-2 rounded-md relative overflow-hidden group"
+                disabled={isLoading || loginPhase === 'loading' || loginPhase === 'success'}
               >
-                {rememberMe && (
-                  <Check className="w-3 h-3 text-primary" />
-                )}
-              </button>
-              <Label 
-                htmlFor="remember-me" 
-                className="text-sm font-normal cursor-pointer"
-                onClick={() => setRememberMe(!rememberMe)}
-              >
-                Remember me
-              </Label>
-            </div>
-
-            {/* Enhanced Sign In Button */}
-            <Button 
-              type="submit" 
-              className="w-full gap-2 rounded-full relative overflow-hidden group"
-              disabled={isLoading || loginPhase === 'loading' || loginPhase === 'success'}
-            >
-              {/* Background progress indicator */}
-              <motion.div 
-                className="absolute inset-0 bg-primary/20"
-                initial={{ width: "0%" }}
-                animate={{ width: `${progress}%` }}
-                transition={{ duration: 0.3 }}
-              />
-              
-              {/* Button Content */}
-              <div className="relative z-10 flex items-center justify-center gap-2">
-                <AnimatePresence mode="wait">
-                  {loginPhase === 'idle' && (
-                    <motion.div
-                      key="idle"
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      className="flex items-center gap-2"
-                    >
-                      <Lock className="w-4 h-4" />
-                      <span>Sign In</span>
-                    </motion.div>
-                  )}
-                  
-                  {loginPhase === 'loading' && (
-                    <motion.div
-                      key="loading"
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: 10 }}
-                      className="flex items-center gap-2"
-                    >
-                      <motion.div
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-                      >
-                        <Loader2 className="w-4 h-4" />
-                      </motion.div>
-                      <motion.span
-                        key={signInText}
-                        initial={{ opacity: 0, y: -5 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: 5 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        {signInText}
-                      </motion.span>
-                    </motion.div>
-                  )}
-                  
-                  {loginPhase === 'success' && (
-                    <motion.div
-                      key="success"
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      className="flex items-center gap-2"
-                    >
-                      <motion.div
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ 
-                          type: "spring",
-                          stiffness: 200,
-                          damping: 15
-                        }}
-                      >
-                        <CheckCircle className="w-4 h-4" />
-                      </motion.div>
-                      <motion.span
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: 0.1 }}
-                      >
-                        {signInText}
-                      </motion.span>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-              
-              {/* Success pulse effect */}
-              {loginPhase === 'success' && (
-                <motion.div
-                  className="absolute inset-0 bg-primary"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: [0, 0.3, 0] }}
-                  transition={{ duration: 0.6, times: [0, 0.5, 1] }}
+                {/* Background progress indicator */}
+                <motion.div 
+                  className="absolute inset-0 bg-primary/20"
+                  initial={{ width: "0%" }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ duration: 0.3 }}
                 />
-              )}
-            </Button>
-          </form>
+                
+                {/* Button Content */}
+                <div className="relative z-10 flex items-center justify-center gap-2">
+                  <AnimatePresence mode="wait">
+                    {loginPhase === 'idle' && (
+                      <motion.div
+                        key="idle"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.8 }}
+                        className="flex items-center gap-2"
+                      >
+                        <Lock className="w-4 h-4" />
+                        <span>Sign In</span>
+                      </motion.div>
+                    )}
+                    
+                    {loginPhase === 'loading' && (
+                      <motion.div
+                        key="loading"
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 10 }}
+                        className="flex items-center gap-2"
+                      >
+                        <motion.div
+                          animate={{ rotate: 360 }}
+                          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        >
+                          <Loader2 className="w-4 h-4" />
+                        </motion.div>
+                        <motion.span
+                          key={signInText}
+                          initial={{ opacity: 0, y: -5 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: 5 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          {signInText}
+                        </motion.span>
+                      </motion.div>
+                    )}
+                    
+                    {loginPhase === 'success' && (
+                      <motion.div
+                        key="success"
+                        initial={{ opacity: 0, scale: 0.8 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="flex items-center gap-2"
+                      >
+                        <motion.div
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ 
+                            type: "spring",
+                            stiffness: 200,
+                            damping: 15
+                          }}
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </motion.div>
+                        <motion.span
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.1 }}
+                        >
+                          {signInText}
+                        </motion.span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+                
+                {/* Success pulse effect */}
+                {loginPhase === 'success' && (
+                  <motion.div
+                    className="absolute inset-0 bg-primary"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: [0, 0.3, 0] }}
+                    transition={{ duration: 0.6, times: [0, 0.5, 1] }}
+                  />
+                )}
+              </Button>
+            </form>
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border" />
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-border" />
+                </div>
+                {/* <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div> */}
               </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">Or</span>
-              </div>
+
+              {/* <div className="mt-6 grid grid-cols-2 gap-3">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDemoLogin}
+                  className="rounded-full"
+                >
+                  Demo Account
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleGuestAccess}
+                  className="rounded-full"
+                >
+                  Guest Access
+                </Button>
+              </div> */}
             </div>
 
-            {/* Optional buttons remain commented out */}
-          </div>
+            <p className="mt-8 text-center text-sm text-muted-foreground">
+              Don't have an account?{' '}
+              <Link to="/signup" className="font-medium text-foreground hover:underline transition-colors">
+                Sign up
+              </Link>
+            </p>
+          </motion.div>
+        </div>
 
-          <p className="mt-8 text-center text-sm text-muted-foreground">
-            Don't have an account?{' '}
-            <Link to="/signup" className="font-medium text-foreground hover:underline">
-              Sign up
-            </Link>
-          </p>
-        </motion.div>
+        {/* Right Panel - Visual */}
+        <div className="hidden lg:flex flex-1 bg-primary items-center justify-center p-12">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.5, delay: 0.2 }}
+            className="text-primary-foreground text-center max-w-md"
+          >
+            <div className="w-24 h-24 rounded-full bg-primary-foreground/10 flex items-center justify-center mx-auto mb-8">
+              <Logo size="lg" showText={false} className="[&_svg]:text-primary-foreground [&_div]:bg-primary-foreground" />
+            </div>
+            <h2 className="text-2xl font-bold mb-4">Your documents, always secure</h2>
+            <p className="opacity-80">
+              Access your personal vault from anywhere. All your sensitive documents are encrypted and protected.
+            </p>
+            
+            {/* Feature highlights */}
+            <div className="mt-8 grid grid-cols-2 gap-4 text-left">
+              <div className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 mt-0.5 text-primary-foreground/80" />
+                <span className="text-sm">End-to-end encrypted</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 mt-0.5 text-primary-foreground/80" />
+                <span className="text-sm">Secure cloud backup</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 mt-0.5 text-primary-foreground/80" />
+                <span className="text-sm">Two-factor auth</span>
+              </div>
+              <div className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 mt-0.5 text-primary-foreground/80" />
+                <span className="text-sm">24/7 support</span>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       </div>
 
-      {/* Right Panel - Visual */}
-      <div className="hidden lg:flex flex-1 bg-primary items-center justify-center p-12">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5, delay: 0.2 }}
-          className="text-primary-foreground text-center max-w-md"
-        >
-          <div className="w-24 h-24 rounded-full bg-primary-foreground/10 flex items-center justify-center mx-auto mb-8">
-            <Logo size="lg" showText={false} className="[&_svg]:text-primary-foreground [&_div]:bg-primary-foreground" />
-          </div>
-          <h2 className="text-2xl font-bold mb-4">Your documents, always secure</h2>
-          <p className="opacity-80">
-            Access your personal vault from anywhere. All your sensitive documents are encrypted and protected.
-          </p>
-        </motion.div>
-      </div>
-    </div>
+      {/* Forgot Password Modal */}
+      <AnimatePresence>
+        {showForgotPassword && (
+          <ForgotPasswordModal
+            isOpen={showForgotPassword}
+            onClose={() => setShowForgotPassword(false)}
+            onBackToLogin={() => setShowForgotPassword(false)}
+          />
+        )}
+      </AnimatePresence>
+    </>
   );
-} 
+}
