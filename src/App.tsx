@@ -70,7 +70,7 @@ const App = () => (
                 path="/dashboard"
                 element={
                   <ProtectedRoute>
-                    <RouteTitle title="Dashboard ">
+                    <RouteTitle title="CloudVault | Dashboard">
                       <Dashboard />
                     </RouteTitle>
                   </ProtectedRoute>
@@ -81,7 +81,7 @@ const App = () => (
                 path="/documents"
                 element={
                   <ProtectedRoute>
-                    <RouteTitle title="All Documents  ">
+                    <RouteTitle title="CloudVault | All documents">
                       <Documents />
                     </RouteTitle>
                   </ProtectedRoute>
@@ -92,7 +92,7 @@ const App = () => (
                 path="/profile"
                 element={
                   <ProtectedRoute>
-                    <RouteTitle title="Profile Page ">
+                    <RouteTitle title="CloudVault | Profile">
                       <Profile />
                     </RouteTitle>
                   </ProtectedRoute>

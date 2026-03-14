@@ -69,7 +69,8 @@ export function VerifyBadge({ verified }: { verified?: boolean }) {
   return (
     <Badge
       variant="link"
-      className="gap-1 text-xs border-none bg-green-500 text-white"
+      className="gap-1 text-xs border-none bg-blue-200 text-blue-700"
+      
     >
       Encrypted
       <CircleCheck className="w-4 h-4" />
@@ -228,7 +229,7 @@ export default function Dashboard() {
           className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5 mb-8"
         >
           <Link to="/documents?action=upload" className="vault-card-hover p-4 flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-primary flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-blue-500 flex items-center justify-center">
               <Upload className="w-5 h-5 text-primary-foreground" />
             </div>
             <div>
@@ -243,7 +244,7 @@ export default function Dashboard() {
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
-                <p className="font-medium">All Documents</p>
+                <p className="font-medium text-xs">All Documents</p>
                 <VerifyBadge verified={user?.verified || activeDocumentCount > 0} />
               </div>
               <p className="text-xs text-muted-foreground">{activeDocumentCount} document{activeDocumentCount !== 1 ? 's' : ''}</p>
@@ -616,10 +617,12 @@ export default function Dashboard() {
                         <CategoryIcon className="w-5 h-5 text-muted-foreground" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium truncate">{doc.name}</p>
-                          {doc.verified && <VerifyBadge verified={true} />}
-                        </div>
+                       <div className="flex items-center gap-2">
+  <p className="text-sm font-medium truncate max-w-[160px] sm:max-w-[200px]">
+    {doc.name}
+  </p>
+  {doc.verified && <VerifyBadge verified={true} />}
+</div>
                         <p className="text-xs text-muted-foreground">
                           {formatBytes(doc.size)} • {format(new Date(doc.uploadedAt), 'MMM d, yyyy')}
                         </p>
@@ -664,10 +667,12 @@ export default function Dashboard() {
                       {activity.action === 'archive' && <Archive className="w-4 h-4" />}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm">
-                        <span className="capitalize">{activity.action}</span>{' '}
-                        <span className="font-medium truncate">{activity.documentName}</span>
-                      </p>
+                    <p className="text-sm flex gap-1 min-w-0">
+  <span className="capitalize flex-shrink-0">{activity.action}</span>
+  <span className="font-medium truncate max-w-[160px]">
+    {activity.documentName}
+  </span>
+</p>
                       <p className="text-xs text-muted-foreground">
                         {formatDistanceToNow(new Date(activity.timestamp), { addSuffix: true })}
                       </p>

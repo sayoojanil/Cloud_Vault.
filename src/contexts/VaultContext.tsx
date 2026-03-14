@@ -1,452 +1,452 @@
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-import { Document, DocumentCategory, ActivityLog, StorageStats } from '@/types/vault';
-import { useAuth } from './AuthContext';
-import {
-  apiGetDocuments,
-  apiUploadDocument,
-  apiUpdateDocument,
-  apiDeleteDocument,
-  apiArchiveDocument,
-  apiToggleFavorite,
-  apiGetActivities,
-  apiGetStats,
-} from '@/lib/api';
-import { toast } from 'sonner';
-import { PDFDocument } from 'pdf-lib';
+  import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+  import { Document, DocumentCategory, ActivityLog, StorageStats } from '@/types/vault';
+  import { useAuth } from './AuthContext';
+  import {
+    apiGetDocuments,
+    apiUploadDocument,
+    apiUpdateDocument,
+    apiDeleteDocument,
+    apiArchiveDocument,
+    apiToggleFavorite,
+    apiGetActivities,
+    apiGetStats,
+  } from '@/lib/api';
+  import { toast } from 'sonner';
+  import { PDFDocument } from 'pdf-lib';
 
-// Helper to load an image element from a File
-const loadImageFromFile = (file: File): Promise<HTMLImageElement> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = (e) => reject(e);
-    img.src = URL.createObjectURL(file);
-  });
-};
-
-// Convert an image File to a single-page PDF File using pdf-lib
-const convertImageFileToPdf = async (file: File): Promise<File> => {
-  // For JPEG, we can embed directly. For others, render to canvas and embed as PNG.
-  const isJpeg = /jpeg|jpg/.test(file.type);
-
-  let imageArrayBuffer: ArrayBuffer;
-
-  if (isJpeg) {
-    imageArrayBuffer = await file.arrayBuffer();
-  } else {
-    // Use canvas to normalize other image types (png, webp, gif) to PNG
-    const img = await loadImageFromFile(file);
-    const canvas = document.createElement('canvas');
-    canvas.width = img.naturalWidth || img.width;
-    canvas.height = img.naturalHeight || img.height;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('Cannot get canvas context');
-    ctx.drawImage(img, 0, 0);
-    const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, 'image/png'));
-    if (!blob) throw new Error('Failed to convert image to PNG');
-    imageArrayBuffer = await blob.arrayBuffer();
-  }
-
-  const pdfDoc = await PDFDocument.create();
-
-  if (isJpeg) {
-    const jpgImage = await pdfDoc.embedJpg(imageArrayBuffer);
-    const page = pdfDoc.addPage([jpgImage.width, jpgImage.height]);
-    page.drawImage(jpgImage, { x: 0, y: 0, width: jpgImage.width, height: jpgImage.height });
-  } else {
-    const pngImage = await pdfDoc.embedPng(imageArrayBuffer);
-    const page = pdfDoc.addPage([pngImage.width, pngImage.height]);
-    page.drawImage(pngImage, { x: 0, y: 0, width: pngImage.width, height: pngImage.height });
-  }
-
-  const pdfBytes = await pdfDoc.save();
-  const pdfFile = new File([pdfBytes], (file.name || `Document`).replace(/\.[^/.]+$/, '') + '.pdf', {
-    type: 'application/pdf',
-  });
-  return pdfFile;
-};
-
-interface VaultContextType {
-  documents: Document[];
-  activities: ActivityLog[];
-  stats: StorageStats;
-  isLoading: boolean;
-  addDocument: (file: File, metadata?: {
-    name?: string;
-    category?: DocumentCategory;
-    type?: string;
-    tags?: string[];
-    metadata?: any;
-  }) => Promise<void>;
-  updateDocument: (id: string, updates: Partial<Document>) => Promise<void>;
-  deleteDocument: (id: string) => Promise<void>;
-  archiveDocument: (id: string) => Promise<void>;
-  toggleFavorite: (id: string) => Promise<void>;
-  searchDocuments: (query: string) => Document[];
-  filterByCategory: (category: DocumentCategory | null) => Document[];
-  filterByTags: (tags: string[]) => Document[];
-  refreshDocuments: () => Promise<void>;
-}
-
-const VaultContext = createContext<VaultContextType | undefined>(undefined);
-
-export function VaultProvider({ children }: { children: React.ReactNode }) {
-  const { user, isAuthenticated } = useAuth();
-  const [documents, setDocuments] = useState<Document[]>([]);
-  const [activities, setActivities] = useState<ActivityLog[]>([]);
-  const [stats, setStats] = useState<StorageStats>({
-    used: 0,
-    limit: 1024 * 1024 * 1024,
-    documentCount: 0,
-    categoryBreakdown: {} as Record<DocumentCategory, number>,
-  });
-  const [isLoading, setIsLoading] = useState(true);
-
-  
-
-  // Transform backend document to frontend format
-  const transformDocument = (doc: any): Document => {
-    return {
-      id: doc._id || doc.id,
-      name: doc.name,
-      type: doc.type,
-      category: doc.category,
-      fileType: doc.fileType,
-      size: doc.size,
-      uploadedAt: new Date(doc.createdAt || doc.uploadedAt),
-      modifiedAt: new Date(doc.updatedAt || doc.modifiedAt),
-      tags: doc.tags || [],
-      metadata: doc.metadata || {},
-      thumbnailUrl: doc.thumbnailUrl,
-      fileUrl: doc.fileUrl,
-      isArchived: doc.isArchived || false,
-      isFavorite: doc.isFavorite || false,
-    };
+  // Helper to load an image element from a File
+  const loadImageFromFile = (file: File): Promise<HTMLImageElement> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = (e) => reject(e);
+      img.src = URL.createObjectURL(file);
+    });
   };
 
-  // Transform backend activity to frontend format
-  const transformActivity = (activity: any): ActivityLog => {
-    return {
-      id: activity._id || activity.id,
-      action: activity.action,
-      documentId: activity.documentId?._id || activity.documentId || activity.documentId,
-      documentName: activity.documentName,
-      timestamp: new Date(activity.createdAt || activity.timestamp),
-    };
-  };
+  // Convert an image File to a single-page PDF File using pdf-lib
+  const convertImageFileToPdf = async (file: File): Promise<File> => {
+    // For JPEG, we can embed directly. For others, render to canvas and embed as PNG.
+    const isJpeg = /jpeg|jpg/.test(file.type);
 
-  // Fetch documents from backend
-  const fetchDocuments = useCallback(async () => {
-    if (!isAuthenticated || user?.isGuest) {
-      setDocuments([]);
-      setIsLoading(false);
-      return;
-    }
+    let imageArrayBuffer: ArrayBuffer;
 
-    try {
-      setIsLoading(true);
-      const docs = await apiGetDocuments();
-      const transformedDocs = docs.map(transformDocument);
-      setDocuments(transformedDocs);
-    } catch (error: any) {
-      console.error('Error fetching documents:', error);
-      toast.error('Failed to load documents');
-      setDocuments([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [isAuthenticated, user?.isGuest]);
-
-  // Fetch activities from backend
-  const fetchActivities = useCallback(async () => {
-    if (!isAuthenticated || user?.isGuest) {
-      setActivities([]);
-      return;
-    }
-
-    try {
-      const acts = await apiGetActivities(50);
-      const transformedActs = acts.map(transformActivity);
-      setActivities(transformedActs);
-    } catch (error: any) {
-      console.error('Error fetching activities:', error);
-    }
-  }, [isAuthenticated, user?.isGuest]);
-
-  // Fetch stats from backend
-  const fetchStats = useCallback(async () => {
-    if (!isAuthenticated || user?.isGuest) {
-      setStats({
-        used: 0,
-        limit: user?.storageLimit || 1024 * 1024 * 1024,
-        documentCount: 0,
-        categoryBreakdown: {} as Record<DocumentCategory, number>,
-      });
-      return;
-    }
-
-    try {
-      const statsData = await apiGetStats();
-      setStats({
-        used: statsData.used || 0,
-        limit: statsData.limit || user?.storageLimit || 1024 * 1024 * 1024,
-        documentCount: statsData.documentCount || 0,
-        categoryBreakdown: statsData.categoryBreakdown || {},
-      });
-    } catch (error: any) {
-      console.error('Error fetching stats:', error);
-    }
-  }, [isAuthenticated, user?.isGuest, user?.storageLimit]);
-
-  // Load data when user changes
-  useEffect(() => {
-    if (user && !user.isGuest && isAuthenticated) {
-      fetchDocuments();
-      fetchActivities();
-      fetchStats();
-    } else if (user?.isGuest) {
-      setDocuments([]);
-      setActivities([]);
-      setStats({
-        used: 0,
-        limit: 100 * 1024 * 1024,
-        documentCount: 0,
-        categoryBreakdown: {} as Record<DocumentCategory, number>,
-      });
-      setIsLoading(false);
+    if (isJpeg) {
+      imageArrayBuffer = await file.arrayBuffer();
     } else {
-      setIsLoading(false);
+      // Use canvas to normalize other image types (png, webp, gif) to PNG
+      const img = await loadImageFromFile(file);
+      const canvas = document.createElement('canvas');
+      canvas.width = img.naturalWidth || img.width;
+      canvas.height = img.naturalHeight || img.height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Cannot get canvas context');
+      ctx.drawImage(img, 0, 0);
+      const blob: Blob | null = await new Promise((res) => canvas.toBlob(res, 'image/png'));
+      if (!blob) throw new Error('Failed to convert image to PNG');
+      imageArrayBuffer = await blob.arrayBuffer();
     }
-  }, [user, isAuthenticated, fetchDocuments, fetchActivities, fetchStats]);
 
-  // Upload document to backend (which uploads to Cloudinary)
-  const addDocument = useCallback(async (
-    file: File,
-    metadata?: {
+    const pdfDoc = await PDFDocument.create();
+
+    if (isJpeg) {
+      const jpgImage = await pdfDoc.embedJpg(imageArrayBuffer);
+      const page = pdfDoc.addPage([jpgImage.width, jpgImage.height]);
+      page.drawImage(jpgImage, { x: 0, y: 0, width: jpgImage.width, height: jpgImage.height });
+    } else {
+      const pngImage = await pdfDoc.embedPng(imageArrayBuffer);
+      const page = pdfDoc.addPage([pngImage.width, pngImage.height]);
+      page.drawImage(pngImage, { x: 0, y: 0, width: pngImage.width, height: pngImage.height });
+    }
+
+    const pdfBytes = await pdfDoc.save();
+    const pdfFile = new File([pdfBytes], (file.name || `Document`).replace(/\.[^/.]+$/, '') + '.pdf', {
+      type: 'application/pdf',
+    });
+    return pdfFile;
+  };
+
+  interface VaultContextType {
+    documents: Document[];
+    activities: ActivityLog[];
+    stats: StorageStats;
+    isLoading: boolean;
+    addDocument: (file: File, metadata?: {
       name?: string;
       category?: DocumentCategory;
       type?: string;
       tags?: string[];
       metadata?: any;
-    }
-  ) => {
-    if (!isAuthenticated || user?.isGuest) {
-      toast.error('Please sign in to upload documents');
-      throw new Error('Authentication required');
-    }
+    }) => Promise<void>;
+    updateDocument: (id: string, updates: Partial<Document>) => Promise<void>;
+    deleteDocument: (id: string) => Promise<void>;
+    archiveDocument: (id: string) => Promise<void>;
+    toggleFavorite: (id: string) => Promise<void>;
+    searchDocuments: (query: string) => Document[];
+    filterByCategory: (category: DocumentCategory | null) => Document[];
+    filterByTags: (tags: string[]) => Document[];
+    refreshDocuments: () => Promise<void>;
+  }
 
-    // Validate file
-    if (!file) {
-      toast.error('No file provided');
-      throw new Error('No file provided');
-    }
+  const VaultContext = createContext<VaultContextType | undefined>(undefined);
 
-    // Ensure all required fields are provided
-    const fileName = metadata?.name || file.name || `Document-${Date.now()}`;
-    const category = metadata?.category || 'other';
-    const requestedType = metadata?.type;
-    const inferredType = file.type === 'application/pdf' ? 'pdf' : 'image';
-    let type = requestedType || inferredType;
-    const tags = metadata?.tags || [];
-    const docMetadata = metadata?.metadata || {};
+  export function VaultProvider({ children }: { children: React.ReactNode }) {
+    const { user, isAuthenticated } = useAuth();
+    const [documents, setDocuments] = useState<Document[]>([]);
+    const [activities, setActivities] = useState<ActivityLog[]>([]);
+    const [stats, setStats] = useState<StorageStats>({
+      used: 0,
+      limit: 1024 * 1024 * 1024,
+      documentCount: 0,
+      categoryBreakdown: {} as Record<DocumentCategory, number>,
+    });
+    const [isLoading, setIsLoading] = useState(true);
 
-    // If the uploaded file is an image, convert it to PDF client-side before uploading
-    let uploadFile: File = file;
-    try {
-      if (file.type && file.type.startsWith('image/') && type !== 'pdf') {
-        uploadFile = await convertImageFileToPdf(file);
-        type = 'pdf';
+    
+
+    // Transform backend document to frontend format
+    const transformDocument = (doc: any): Document => {
+      return {
+        id: doc._id || doc.id,
+        name: doc.name,
+        type: doc.type,
+        category: doc.category,
+        fileType: doc.fileType,
+        size: doc.size,
+        uploadedAt: new Date(doc.createdAt || doc.uploadedAt),
+        modifiedAt: new Date(doc.updatedAt || doc.modifiedAt),
+        tags: doc.tags || [],
+        metadata: doc.metadata || {},
+        thumbnailUrl: doc.thumbnailUrl,
+        fileUrl: doc.fileUrl,
+        isArchived: doc.isArchived || false,
+        isFavorite: doc.isFavorite || false,
+      };
+    };
+
+    // Transform backend activity to frontend format
+    const transformActivity = (activity: any): ActivityLog => {
+      return {
+        id: activity._id || activity.id,
+        action: activity.action,
+        documentId: activity.documentId?._id || activity.documentId || activity.documentId,
+        documentName: activity.documentName,
+        timestamp: new Date(activity.createdAt || activity.timestamp),
+      };
+    };
+
+    // Fetch documents from backend
+    const fetchDocuments = useCallback(async () => {
+      if (!isAuthenticated || user?.isGuest) {
+        setDocuments([]);
+        setIsLoading(false);
+        return;
       }
-    } catch (convError) {
-      console.error('Image to PDF conversion failed:', convError);
-      toast.error('Failed to convert image to PDF; uploading original file');
-      uploadFile = file;
+
+      try {
+        setIsLoading(true);
+        const docs = await apiGetDocuments();
+        const transformedDocs = docs.map(transformDocument);
+        setDocuments(transformedDocs);
+      } catch (error: any) {
+        console.error('Error fetching documents:', error);
+        toast.error('Failed to load documents');
+        setDocuments([]);
+      } finally {
+        setIsLoading(false);
+      }
+    }, [isAuthenticated, user?.isGuest]);
+
+    // Fetch activities from backend
+    const fetchActivities = useCallback(async () => {
+      if (!isAuthenticated || user?.isGuest) {
+        setActivities([]);
+        return;
+      }
+
+      try {
+        const acts = await apiGetActivities(50);
+        const transformedActs = acts.map(transformActivity);
+        setActivities(transformedActs);
+      } catch (error: any) {
+        console.error('Error fetching activities:', error);
+      }
+    }, [isAuthenticated, user?.isGuest]);
+
+    // Fetch stats from backend
+    const fetchStats = useCallback(async () => {
+      if (!isAuthenticated || user?.isGuest) {
+        setStats({
+          used: 0,
+          limit: user?.storageLimit || 1024 * 1024 * 1024,
+          documentCount: 0,
+          categoryBreakdown: {} as Record<DocumentCategory, number>,
+        });
+        return;
+      }
+
+      try {
+        const statsData = await apiGetStats();
+        setStats({
+          used: statsData.used || 0,
+          limit: statsData.limit || user?.storageLimit || 1024 * 1024 * 1024,
+          documentCount: statsData.documentCount || 0,
+          categoryBreakdown: statsData.categoryBreakdown || {},
+        });
+      } catch (error: any) {
+        console.error('Error fetching stats:', error);
+      }
+    }, [isAuthenticated, user?.isGuest, user?.storageLimit]);
+
+    // Load data when user changes
+    useEffect(() => {
+      if (user && !user.isGuest && isAuthenticated) {
+        fetchDocuments();
+        fetchActivities();
+        fetchStats();
+      } else if (user?.isGuest) {
+        setDocuments([]);
+        setActivities([]);
+        setStats({
+          used: 0,
+          limit: 100 * 1024 * 1024,
+          documentCount: 0,
+          categoryBreakdown: {} as Record<DocumentCategory, number>,
+        });
+        setIsLoading(false);
+      } else {
+        setIsLoading(false);
+      }
+    }, [user, isAuthenticated, fetchDocuments, fetchActivities, fetchStats]);
+
+    // Upload document to backend (which uploads to Cloudinary)
+    const addDocument = useCallback(async (
+      file: File,
+      metadata?: {
+        name?: string;
+        category?: DocumentCategory;
+        type?: string;
+        tags?: string[];
+        metadata?: any;
+      }
+    ) => {
+      if (!isAuthenticated || user?.isGuest) {
+        toast.error('Please sign in to upload documents');
+        throw new Error('Authentication required');
+      }
+
+      // Validate file
+      if (!file) {
+        toast.error('No file provided');
+        throw new Error('No file provided');
+      }
+
+      // Ensure all required fields are provided
+      const fileName = metadata?.name || file.name || `Document-${Date.now()}`;
+      const category = metadata?.category || 'other';
+      const requestedType = metadata?.type;
+      const inferredType = file.type === 'application/pdf' ? 'pdf' : 'image';
+      let type = requestedType || inferredType;
+      const tags = metadata?.tags || [];
+      const docMetadata = metadata?.metadata || {};
+
+      // If the uploaded file is an image, convert it to PDF client-side before uploading
+      let uploadFile: File = file;
+      try {
+        if (file.type && file.type.startsWith('image/') && type !== 'pdf') {
+          uploadFile = await convertImageFileToPdf(file);
+          type = 'pdf';
+        }
+      } catch (convError) {
+        console.error('Image to PDF conversion failed:', convError);
+        toast.error('Failed to convert image to PDF; uploading original file');
+        uploadFile = file;
+      }
+
+      try {
+        const uploadedDoc = await apiUploadDocument(uploadFile, {
+          name: fileName,
+          category: category,
+          type: type,
+          tags: tags,
+          metadata: docMetadata,
+        });
+
+        const transformedDoc = transformDocument(uploadedDoc);
+        setDocuments(prev => [transformedDoc, ...prev]);
+        
+        // Refresh stats and activities
+        await Promise.all([
+          fetchStats().catch(err => console.error('Failed to refresh stats:', err)),
+          fetchActivities().catch(err => console.error('Failed to refresh activities:', err))
+        ]);
+        
+        toast.success(`${fileName} uploaded successfully`);
+        return transformedDoc;
+      } catch (error: any) {
+        console.error('Error uploading document:', error);
+        const errorMessage = error?.message || 'Failed to upload document';
+        toast.error(errorMessage);
+        throw error;
+      }
+    }, [isAuthenticated, user?.isGuest, fetchStats, fetchActivities]);
+
+    // Update document
+  const updateDocument = useCallback(async (id: string, updates: Partial<Document>) => {
+    if (!isAuthenticated || user?.isGuest) {
+      toast.error('Please sign in to update documents');
+      return;
     }
 
+    // 🔹 Get existing document name BEFORE update
+    const existingDoc = documents.find(doc => doc.id === id);
+    const documentName = updates.name || existingDoc?.name || 'Document';
+
     try {
-      const uploadedDoc = await apiUploadDocument(uploadFile, {
-        name: fileName,
-        category: category,
-        type: type,
-        tags: tags,
-        metadata: docMetadata,
+      const updatedDoc = await apiUpdateDocument(id, updates);
+      const transformedDoc = transformDocument(updatedDoc);
+
+      setDocuments(prev =>
+        prev.map(doc => doc.id === id ? transformedDoc : doc)
+      );
+
+      await fetchActivities();
+
+      toast.success('Document updated', {
+        description: `"${documentName}" has been updated successfully.`,
       });
 
-      const transformedDoc = transformDocument(uploadedDoc);
-      setDocuments(prev => [transformedDoc, ...prev]);
-      
-      // Refresh stats and activities
-      await Promise.all([
-        fetchStats().catch(err => console.error('Failed to refresh stats:', err)),
-        fetchActivities().catch(err => console.error('Failed to refresh activities:', err))
-      ]);
-      
-      toast.success(`${fileName} uploaded successfully`);
-      return transformedDoc;
     } catch (error: any) {
-      console.error('Error uploading document:', error);
-      const errorMessage = error?.message || 'Failed to upload document';
-      toast.error(errorMessage);
+      console.error('Error updating document:', error);
+      toast.error('Failed to update document');
       throw error;
     }
-  }, [isAuthenticated, user?.isGuest, fetchStats, fetchActivities]);
-
-  // Update document
- const updateDocument = useCallback(async (id: string, updates: Partial<Document>) => {
-  if (!isAuthenticated || user?.isGuest) {
-    toast.error('Please sign in to update documents');
-    return;
-  }
-
-  // 🔹 Get existing document name BEFORE update
-  const existingDoc = documents.find(doc => doc.id === id);
-  const documentName = updates.name || existingDoc?.name || 'Document';
-
-  try {
-    const updatedDoc = await apiUpdateDocument(id, updates);
-    const transformedDoc = transformDocument(updatedDoc);
-
-    setDocuments(prev =>
-      prev.map(doc => doc.id === id ? transformedDoc : doc)
-    );
-
-    await fetchActivities();
-
-    toast.success('Document updated', {
-      description: `"${documentName}" has been updated successfully.`,
-    });
-
-  } catch (error: any) {
-    console.error('Error updating document:', error);
-    toast.error('Failed to update document');
-    throw error;
-  }
-}, [isAuthenticated, user?.isGuest, documents, fetchActivities]);
+  }, [isAuthenticated, user?.isGuest, documents, fetchActivities]);
 
 
-  // Delete document
-  const deleteDocument = useCallback(async (id: string) => {
-    if (!isAuthenticated || user?.isGuest) {
-      toast.error('Please sign in to delete documents');
-      return;
-    }
+    // Delete document
+    const deleteDocument = useCallback(async (id: string) => {
+      if (!isAuthenticated || user?.isGuest) {
+        toast.error('Please sign in to delete documents');
+        return;
+      }
 
-    try {
-      await apiDeleteDocument(id);
-      setDocuments(prev => prev.filter(doc => doc.id !== id));
-      
-      // Refresh stats and activities
+      try {
+        await apiDeleteDocument(id);
+        setDocuments(prev => prev.filter(doc => doc.id !== id));
+        
+        // Refresh stats and activities
+        await fetchStats();
+        await fetchActivities();
+        
+        // toast.success('Document deleted successfully');
+      } catch (error: any) {
+        console.error('Error deleting document:', error);
+        toast.error('Failed to delete document');
+        throw error;
+      }
+    }, [isAuthenticated, user?.isGuest, fetchStats, fetchActivities]);
+
+    // Archive document
+    const archiveDocument = useCallback(async (id: string) => {
+      if (!isAuthenticated || user?.isGuest) {
+        toast.error('Please sign in to archive documents');
+        return;
+      }
+
+      try {
+        const archivedDoc = await apiArchiveDocument(id);
+        const transformedDoc = transformDocument(archivedDoc);
+        
+        setDocuments(prev =>
+          prev.map(doc => doc.id === id ? transformedDoc : doc)
+        );
+        
+        await fetchActivities();
+        toast.success('Document archived successfully');
+      } catch (error: any) {
+        console.error('Error archiving document:', error);
+        toast.error('Failed to archive document');
+        throw error;
+      }
+    }, [isAuthenticated, user?.isGuest, fetchActivities]);
+
+    // Toggle favorite
+    const toggleFavorite = useCallback(async (id: string) => {
+      if (!isAuthenticated || user?.isGuest) {
+        return;
+      }
+
+      try {
+        const updatedDoc = await apiToggleFavorite(id);
+        const transformedDoc = transformDocument(updatedDoc);
+        
+        setDocuments(prev =>
+          prev.map(doc => doc.id === id ? transformedDoc : doc)
+        );
+      } catch (error: any) {
+        console.error('Error toggling favorite:', error);
+        toast.error('Failed to update favorite status');
+      }
+    }, [isAuthenticated, user?.isGuest]);
+
+    // Search documents (client-side filtering)
+    const searchDocuments = useCallback((query: string): Document[] => {
+      const lowerQuery = query.toLowerCase();
+      return documents.filter(doc =>
+        doc.name.toLowerCase().includes(lowerQuery) ||
+        doc.tags.some(tag => tag.toLowerCase().includes(lowerQuery)) ||
+        doc.metadata.issuer?.toLowerCase().includes(lowerQuery) ||
+        doc.metadata.notes?.toLowerCase().includes(lowerQuery)
+      );
+    }, [documents]);
+
+    // Filter by category
+    const filterByCategory = useCallback((category: DocumentCategory | null): Document[] => {
+      if (!category) return documents.filter(d => !d.isArchived);
+      return documents.filter(doc => doc.category === category && !doc.isArchived);
+    }, [documents]);
+
+    // Filter by tags
+    const filterByTags = useCallback((tags: string[]): Document[] => {
+      if (tags.length === 0) return documents.filter(d => !d.isArchived);
+      return documents.filter(doc =>
+        tags.some(tag => doc.tags.includes(tag)) && !doc.isArchived
+      );
+    }, [documents]);
+
+    // Refresh documents
+    const refreshDocuments = useCallback(async () => {
+      await fetchDocuments();
+      await fetchActivities();
       await fetchStats();
-      await fetchActivities();
-      
-      // toast.success('Document deleted successfully');
-    } catch (error: any) {
-      console.error('Error deleting document:', error);
-      toast.error('Failed to delete document');
-      throw error;
-    }
-  }, [isAuthenticated, user?.isGuest, fetchStats, fetchActivities]);
+    }, [fetchDocuments, fetchActivities, fetchStats]);
 
-  // Archive document
-  const archiveDocument = useCallback(async (id: string) => {
-    if (!isAuthenticated || user?.isGuest) {
-      toast.error('Please sign in to archive documents');
-      return;
-    }
-
-    try {
-      const archivedDoc = await apiArchiveDocument(id);
-      const transformedDoc = transformDocument(archivedDoc);
-      
-      setDocuments(prev =>
-        prev.map(doc => doc.id === id ? transformedDoc : doc)
-      );
-      
-      await fetchActivities();
-      toast.success('Document archived successfully');
-    } catch (error: any) {
-      console.error('Error archiving document:', error);
-      toast.error('Failed to archive document');
-      throw error;
-    }
-  }, [isAuthenticated, user?.isGuest, fetchActivities]);
-
-  // Toggle favorite
-  const toggleFavorite = useCallback(async (id: string) => {
-    if (!isAuthenticated || user?.isGuest) {
-      return;
-    }
-
-    try {
-      const updatedDoc = await apiToggleFavorite(id);
-      const transformedDoc = transformDocument(updatedDoc);
-      
-      setDocuments(prev =>
-        prev.map(doc => doc.id === id ? transformedDoc : doc)
-      );
-    } catch (error: any) {
-      console.error('Error toggling favorite:', error);
-      toast.error('Failed to update favorite status');
-    }
-  }, [isAuthenticated, user?.isGuest]);
-
-  // Search documents (client-side filtering)
-  const searchDocuments = useCallback((query: string): Document[] => {
-    const lowerQuery = query.toLowerCase();
-    return documents.filter(doc =>
-      doc.name.toLowerCase().includes(lowerQuery) ||
-      doc.tags.some(tag => tag.toLowerCase().includes(lowerQuery)) ||
-      doc.metadata.issuer?.toLowerCase().includes(lowerQuery) ||
-      doc.metadata.notes?.toLowerCase().includes(lowerQuery)
+    return (
+      <VaultContext.Provider value={{
+        documents,
+        activities,
+        stats,
+        isLoading,
+        addDocument,
+        updateDocument,
+        deleteDocument,
+        archiveDocument,
+        toggleFavorite,
+        searchDocuments,
+        filterByCategory,
+        filterByTags,
+        refreshDocuments,
+      }}>
+        {children}
+      </VaultContext.Provider>
     );
-  }, [documents]);
-
-  // Filter by category
-  const filterByCategory = useCallback((category: DocumentCategory | null): Document[] => {
-    if (!category) return documents.filter(d => !d.isArchived);
-    return documents.filter(doc => doc.category === category && !doc.isArchived);
-  }, [documents]);
-
-  // Filter by tags
-  const filterByTags = useCallback((tags: string[]): Document[] => {
-    if (tags.length === 0) return documents.filter(d => !d.isArchived);
-    return documents.filter(doc =>
-      tags.some(tag => doc.tags.includes(tag)) && !doc.isArchived
-    );
-  }, [documents]);
-
-  // Refresh documents
-  const refreshDocuments = useCallback(async () => {
-    await fetchDocuments();
-    await fetchActivities();
-    await fetchStats();
-  }, [fetchDocuments, fetchActivities, fetchStats]);
-
-  return (
-    <VaultContext.Provider value={{
-      documents,
-      activities,
-      stats,
-      isLoading,
-      addDocument,
-      updateDocument,
-      deleteDocument,
-      archiveDocument,
-      toggleFavorite,
-      searchDocuments,
-      filterByCategory,
-      filterByTags,
-      refreshDocuments,
-    }}>
-      {children}
-    </VaultContext.Provider>
-  );
-}
-
-export function useVault() {
-  const context = useContext(VaultContext);
-  if (context === undefined) {
-    throw new Error('useVault must be used within a VaultProvider');
   }
-  return context;
-}
+
+  export function useVault() {
+    const context = useContext(VaultContext);
+    if (context === undefined) {
+      throw new Error('useVault must be used within a VaultProvider');
+    }
+    return context;
+  }

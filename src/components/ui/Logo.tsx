@@ -7,6 +7,7 @@ interface LogoProps {
   showText?: boolean;
 }
 
+
 export function Logo({ className, size = 'md', showText = true }: LogoProps) {
   const sizes = {
     sm: { icon: 'w-5 h-5', text: 'text-lg' },

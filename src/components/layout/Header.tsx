@@ -224,9 +224,9 @@ export function Header() {
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
-                          <Link to="/settings" className="flex items-center gap-2">
+                          {/* <Link to="/settings" className="flex items-center gap-2">
                             Settings
-                          </Link>
+                          </Link> */}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
