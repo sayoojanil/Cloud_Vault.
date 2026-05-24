@@ -34,7 +34,8 @@ import {
   Minimize2,
   ZoomIn,
   ZoomOut,
-  RotateCw
+  RotateCw,
+  Camera
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -127,12 +128,97 @@ export default function Documents() {
   const [zoomImageName, setZoomImageName] = useState<string>('');
   const uploadBellRef = useRef<HTMLAudioElement | null>(null);
 
+  // Camera states
+  const [isCameraOpen, setIsCameraOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
 
   useEffect(() => {
   uploadBellRef.current = new Audio('/bell.wav');
 }, []);
 
+  const stopCamera = useCallback(() => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+  }, [cameraStream]);
 
+  useEffect(() => {
+    if (!showUploadDialog) {
+      if (isCameraOpen) {
+        stopCamera();
+        setIsCameraOpen(false);
+      }
+    }
+  }, [showUploadDialog, isCameraOpen, stopCamera]);
+
+  useEffect(() => {
+    return () => {
+      stopCamera();
+    };
+  }, [stopCamera]);
+
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      setCameraStream(stream);
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.error('Camera error:', err);
+      toast.error('Could not access camera');
+      setIsCameraOpen(false);
+    }
+  };
+
+  const capturePhoto = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!videoRef.current) {
+      toast.error('Camera video not found');
+      return;
+    }
+    if (!canvasRef.current) {
+      toast.error('Camera canvas not found');
+      return;
+    }
+
+    const video = videoRef.current;
+    const canvas = canvasRef.current;
+
+    if (video.videoWidth === 0 || video.videoHeight === 0) {
+      toast.error('Camera is still initializing, please wait');
+      return;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) {
+      toast.error('Failed to initialize capture context');
+      return;
+    }
+
+    try {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      canvas.toBlob((blob) => {
+        if (blob) {
+          const file = new File([blob], `Camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+          handleFiles([file]);
+          stopCamera();
+          setIsCameraOpen(false);
+        } else {
+          toast.error('Failed to capture image');
+        }
+      }, 'image/jpeg', 0.9);
+    } catch (err) {
+      console.error('Capture error:', err);
+      toast.error('Error taking photo');
+    }
+  };
 
   document.title="Documents";
 
@@ -734,28 +820,75 @@ export default function Documents() {
               Drag and drop files or click to browse. Supports PDF, JPG, PNG, WebP, and GIF.
             </DialogDescription>
           </DialogHeader>
-          <div
-            className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors ${dragActive ? 'border-primary bg-primary/5' : 'border-border'
-              }`}
-            onDragEnter={handleDrag}
-            onDragLeave={handleDrag}
-            onDragOver={handleDrag}
-            onDrop={handleDrop}
-          >
-            <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
-            <p className="font-medium mb-1">Drop files here</p>
-            <p className="text-sm text-muted-foreground mb-4">or click to browse</p>
-            <input
-              type="file"
-              id="file-upload"
-              className="hidden"
-              accept=".pdf,.jpg,.jpeg,.png,.webp,.gif"
-              multiple
-              onChange={(e) => handleFiles(Array.from(e.target.files || []))}
-            />
-            <Button className='rounded-full bg-black text-white hover:bg-gray-600 hover:text-white' variant="outline" onClick={() => document.getElementById('file-upload')?.click()}>
-              Select Files
-            </Button>
+          <div className="flex flex-col items-center w-full">
+            {!isCameraOpen ? (
+              <div
+                className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors w-full ${dragActive ? 'border-primary bg-primary/5' : 'border-border'
+                  }`}
+                onDragEnter={handleDrag}
+                onDragLeave={handleDrag}
+                onDragOver={handleDrag}
+                onDrop={handleDrop}
+              >
+                <Upload className="w-10 h-10 text-muted-foreground mx-auto mb-4" />
+                <p className="font-medium mb-1">Drop files here</p>
+                <p className="text-sm text-muted-foreground mb-4">or click to browse</p>
+                <input
+                  type="file"
+                  id="file-upload"
+                  className="hidden"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.gif"
+                  multiple
+                  onChange={(e) => handleFiles(Array.from(e.target.files || []))}
+                />
+                <div className="flex justify-center gap-4">
+                  <Button className='rounded-full bg-black text-white hover:bg-gray-600 hover:text-white' variant="outline" onClick={() => document.getElementById('file-upload')?.click()}>
+                    Select Files
+                  </Button>
+                  <Button 
+                    className='rounded-full bg-black text-white hover:bg-gray-600 hover:text-white' 
+                    variant="outline" 
+                    onClick={() => {
+                      setIsCameraOpen(true);
+                      startCamera();
+                    }}
+                  >
+                    <Camera className="w-4 h-4 mr-2" />
+                    Open Camera
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="w-full flex flex-col items-center gap-4">
+                <div className="relative w-full aspect-video bg-black rounded-lg overflow-hidden">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    className="w-full h-full object-cover"
+                  />
+                  <canvas ref={canvasRef} className="hidden" />
+                </div>
+                <div className="flex gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      stopCamera();
+                      setIsCameraOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    className='bg-black text-white hover:bg-gray-600'
+                    onClick={capturePhoto}
+                  >
+                    <Camera className="w-4 h-4 mr-2" />
+                    Capture Photo
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
           <p className="text-xs text-muted-foreground text-center">
             Maximum file size: 20MB • Supported formats: PDF, JPG, PNG, WebP, GIF

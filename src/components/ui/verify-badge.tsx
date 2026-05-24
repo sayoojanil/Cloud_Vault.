@@ -7,7 +7,7 @@ export function VerifyBadge({ verified }: { verified?: boolean }) {
   return (
     <Badge
       variant="link"
-      className="gap-1 text-xs text-blue-500 border-none bg-green-50"
+      className="gap-1 text-xs text-green-500 border-none bg-green-100"
       
     >
         Verified
