@@ -35,7 +35,8 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCw,
-  Camera
+  Camera,
+  Share2
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
@@ -134,6 +135,16 @@ export default function Documents() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
 
+  // Pending Upload states
+  const [pendingUploadFile, setPendingUploadFile] = useState<window.File | null>(null);
+  const [uploadFormData, setUploadFormData] = useState({
+    name: '',
+    category: 'other' as DocumentCategory,
+    notes: '',
+    issuer: '',
+    tags: ''
+  });
+
   useEffect(() => {
   uploadBellRef.current = new Audio('/bell.wav');
 }, []);
@@ -151,6 +162,7 @@ export default function Documents() {
         stopCamera();
         setIsCameraOpen(false);
       }
+      setPendingUploadFile(null);
     }
   }, [showUploadDialog, isCameraOpen, stopCamera]);
 
@@ -174,49 +186,88 @@ export default function Documents() {
     }
   };
 
-  const capturePhoto = (e: React.MouseEvent) => {
+  const capturePhoto = async (e: React.MouseEvent) => {
     e.preventDefault();
     if (!videoRef.current) {
       toast.error('Camera video not found');
       return;
     }
-    if (!canvasRef.current) {
-      toast.error('Camera canvas not found');
-      return;
-    }
 
     const video = videoRef.current;
-    const canvas = canvasRef.current;
 
     if (video.videoWidth === 0 || video.videoHeight === 0) {
       toast.error('Camera is still initializing, please wait');
       return;
     }
 
-    const context = canvas.getContext('2d');
-    if (!context) {
-      toast.error('Failed to initialize capture context');
-      return;
-    }
+    const toastId = toast.loading('Processing image...');
 
     try {
+      const canvas = document.createElement('canvas');
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
+      const context = canvas.getContext('2d');
+      
+      if (!context) {
+        toast.error('Failed to initialize capture context', { id: toastId });
+        return;
+      }
+
       context.drawImage(video, 0, 0, canvas.width, canvas.height);
       
-      canvas.toBlob((blob) => {
-        if (blob) {
-          const file = new File([blob], `Camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
-          handleFiles([file]);
-          stopCamera();
-          setIsCameraOpen(false);
-        } else {
-          toast.error('Failed to capture image');
-        }
-      }, 'image/jpeg', 0.9);
-    } catch (err) {
+      const dataUrl = canvas.toDataURL('image/jpeg', 0.9);
+      
+      // Manually convert data URL to File to avoid fetch() issues with data: URIs
+      const base64Data = dataUrl.split(',')[1];
+      const byteString = atob(base64Data);
+      const arrayBuffer = new ArrayBuffer(byteString.length);
+      const uint8Array = new Uint8Array(arrayBuffer);
+      
+      for (let i = 0; i < byteString.length; i++) {
+        uint8Array[i] = byteString.charCodeAt(i);
+      }
+      
+      const blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
+      const file = new window.File([blob], `Camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      
+      toast.dismiss(toastId);
+      
+      setPendingUploadFile(file);
+      setUploadFormData({
+        name: `Camera-${format(new Date(), 'yyyy-MM-dd-HHmm')}`,
+        category: 'other',
+        notes: '',
+        issuer: '',
+        tags: ''
+      });
+      stopCamera();
+      setIsCameraOpen(false);
+    } catch (err: any) {
       console.error('Capture error:', err);
-      toast.error('Error taking photo');
+      toast.error('Error taking photo: ' + (err.message || 'Unknown error'), { id: toastId });
+    }
+  };
+
+  const confirmUpload = async () => {
+    if (!pendingUploadFile) return;
+    const toastId = toast.loading('Uploading document...');
+    try {
+      await addDocument(pendingUploadFile, {
+        name: uploadFormData.name || pendingUploadFile.name,
+        category: uploadFormData.category,
+        type: 'image',
+        tags: uploadFormData.tags.split(',').map(t => t.trim()).filter(Boolean),
+        metadata: {
+          notes: uploadFormData.notes,
+          issuer: uploadFormData.issuer,
+        },
+      });
+      uploadBellRef.current?.play().catch(() => {});
+      toast.success('Document uploaded successfully', { id: toastId });
+      setShowUploadDialog(false);
+      setPendingUploadFile(null);
+    } catch (error: any) {
+      toast.error('Upload failed: ' + (error.message || 'Unknown error'), { id: toastId });
     }
   };
 
@@ -273,6 +324,30 @@ export default function Documents() {
     }
   };
 
+  // Share document
+  const handleShare = async (doc: Document) => {
+    try {
+      const token = localStorage.getItem('vault_token');
+      const apiUrl = import.meta.env.VITE_API_URL;
+      const shareUrl = `${apiUrl}/api/documents/${doc.id}/view?token=${token}`;
+
+      if (navigator.share) {
+        await navigator.share({
+          title: doc.name,
+          text: `Check out this document: ${doc.name}`,
+          url: shareUrl,
+        });
+      } else {
+        await navigator.clipboard.writeText(shareUrl);
+        toast.success('Link copied to clipboard!');
+      }
+    } catch (error: any) {
+      if (error.name !== 'AbortError') {
+        toast.error('Failed to share document');
+      }
+    }
+  };
+
   // Filter documents
   const filteredDocuments = useMemo(() => {
     let filtered = documents.filter(d => !d.isArchived);
@@ -326,15 +401,44 @@ export default function Documents() {
     handleFiles(files);
   }, []);
 
-  const handleFiles = async (files: File[]) => {
+  const handleFiles = async (files: window.File[]) => {
     const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 
     if (files.length === 0) {
       return;
     }
 
+    if (files.length === 1) {
+      const file = files[0];
+      if (!validTypes.includes(file.type)) {
+        toast.error(`${file.name || 'File'} is not a supported file type. Only PDF, JPG, PNG, WebP, and GIF are allowed.`);
+        return;
+      }
+
+      const maxSize = 20 * 1024 * 1024; // 20MB
+      if (file.size > maxSize) {
+        toast.error(`${file.name || 'File'} is too large. Maximum file size is 20MB.`);
+        return;
+      }
+      
+      setPendingUploadFile(file);
+      
+      let defaultName = file.name || `Document-${Date.now()}`;
+      const extIndex = defaultName.lastIndexOf('.');
+      if (extIndex > 0) defaultName = defaultName.substring(0, extIndex);
+      
+      setUploadFormData({
+        name: defaultName,
+        category: 'other',
+        notes: '',
+        issuer: '',
+        tags: ''
+      });
+      return;
+    }
+
     // Show loading toast
-    const toastId = toast.loading(`Uploading ${files.length} file${files.length > 1 ? 's' : ''}...`);
+    const toastId = toast.loading(`Uploading ${files.length} files...`);
     
     let successfulUploads = 0;
     let failedUploads = 0;
@@ -344,7 +448,7 @@ export default function Documents() {
         // Validate file type
         if (!validTypes.includes(file.type)) {
           failedUploads++;
-          toast.error(`${file.name || 'File'} is not a supported file type. Only PDF, JPG, PNG, WebP, and GIF are allowed.`, {
+          toast.error(`${file.name || 'File'} is not a supported file type.`, {
             id: `error-${Date.now()}`,
           });
           continue;
@@ -361,12 +465,7 @@ export default function Documents() {
         }
 
         // Determine file type
-        let fileType: 'pdf' | 'image';
-        if (file.type === 'application/pdf') {
-          fileType = 'pdf';
-        } else {
-          fileType = 'image';
-        }
+        let fileType: 'pdf' | 'image' = file.type === 'application/pdf' ? 'pdf' : 'image';
 
         // Ensure file name is not empty
         const fileName = file.name || `Document-${Date.now()}`;
@@ -389,30 +488,17 @@ export default function Documents() {
         }
       }
 
-      
-
       // Update the loading toast with result
-   if (successfulUploads > 0 && failedUploads === 0) {
-  uploadBellRef.current?.play().catch(() => {});
-  
-  toast.success(`Successfully uploaded ${successfulUploads} file${successfulUploads > 1 ? 's' : ''}`, {
-    id: toastId,
-  });
-
-
+      if (successfulUploads > 0 && failedUploads === 0) {
+        uploadBellRef.current?.play().catch(() => {});
+        toast.success(`Successfully uploaded ${successfulUploads} files`, { id: toastId });
       } else if (successfulUploads > 0 && failedUploads > 0) {
-        toast.warning(`Uploaded ${successfulUploads} file${successfulUploads > 1 ? 's' : ''}, ${failedUploads} failed`, {
-          id: toastId,
-        });
+        toast.warning(`Uploaded ${successfulUploads} files, ${failedUploads} failed`, { id: toastId });
       } else if (successfulUploads === 0) {
-        toast.error('No files were uploaded successfully', {
-          id: toastId,
-        });
+        toast.error('No files were uploaded successfully', { id: toastId });
       }
     } catch (error: any) {
-      toast.error('Upload failed: ' + (error.message || 'Unknown error'), {
-        id: toastId,
-      });
+      toast.error('Upload failed: ' + (error.message || 'Unknown error'), { id: toastId });
     } finally {
       setShowUploadDialog(false);
     }
@@ -666,6 +752,10 @@ export default function Documents() {
                                 <Download className="w-4 h-4 mr-2" />
                                 Download
                               </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleShare(doc)}>
+                                <Share2 className="w-4 h-4 mr-2" />
+                                Share
+                              </DropdownMenuItem>
                               <DropdownMenuSeparator />
                               <DropdownMenuItem onClick={() => handleArchive(doc)}>
                                 <Archive className="w-4 h-4 mr-2" />
@@ -782,6 +872,13 @@ export default function Documents() {
                           <Download className="w-4 h-4 mr-2" />
                           Download
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={(e) => {
+                          e.stopPropagation();
+                          handleShare(doc);
+                        }}>
+                          <Share2 className="w-4 h-4 mr-2" />
+                          Share
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={(e) => {
                           e.stopPropagation();
@@ -821,7 +918,67 @@ export default function Documents() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center w-full">
-            {!isCameraOpen ? (
+            {pendingUploadFile ? (
+              <div className="w-full space-y-4 text-left">
+                <div className="space-y-2">
+                  <Label>Document Name</Label>
+                  <Input 
+                    value={uploadFormData.name} 
+                    onChange={e => setUploadFormData({...uploadFormData, name: e.target.value})} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Category</Label>
+                  <Select
+                    value={uploadFormData.category}
+                    onValueChange={(value) => setUploadFormData({...uploadFormData, category: value as DocumentCategory})}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select category" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(CATEGORY_LABELS) as DocumentCategory[]).map((cat) => (
+                        <SelectItem key={cat} value={cat}>
+                          {CATEGORY_LABELS[cat]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Issuer</Label>
+                  <Input 
+                    placeholder="e.g. Govt, Hospital, etc." 
+                    value={uploadFormData.issuer} 
+                    onChange={e => setUploadFormData({...uploadFormData, issuer: e.target.value})} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Tags (comma separated)</Label>
+                  <Input 
+                    placeholder="e.g. personal, important" 
+                    value={uploadFormData.tags} 
+                    onChange={e => setUploadFormData({...uploadFormData, tags: e.target.value})} 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Notes</Label>
+                  <Textarea 
+                    placeholder="Add any additional notes here..." 
+                    value={uploadFormData.notes} 
+                    onChange={e => setUploadFormData({...uploadFormData, notes: e.target.value})} 
+                  />
+                </div>
+                <div className="flex gap-4 pt-4">
+                  <Button variant="outline" className="flex-1" onClick={() => setPendingUploadFile(null)}>
+                    Discard
+                  </Button>
+                  <Button className="flex-1 bg-black text-white hover:bg-gray-600" onClick={confirmUpload}>
+                    Upload Photo
+                  </Button>
+                </div>
+              </div>
+            ) : !isCameraOpen ? (
               <div
                 className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors w-full ${dragActive ? 'border-primary bg-primary/5' : 'border-border'
                   }`}

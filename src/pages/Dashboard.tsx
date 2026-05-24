@@ -69,7 +69,7 @@ export function VerifyBadge({ verified }: { verified?: boolean }) {
   return (
     <Badge
       variant="link"
-      className="gap-1 text-xs border-none bg-blue-200 text-blue-700"
+      className="gap-1 text-xs border-none bg-green-500 text-white"
       
     >
       Encrypted
