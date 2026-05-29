@@ -70,6 +70,7 @@ export async function apiUploadDocument(
     type?: string;
     tags?: string[];
     metadata?: any;
+    folder?: string;
   }
 ) {
   const formData = new FormData();
@@ -79,6 +80,10 @@ export async function apiUploadDocument(
   formData.append("name", metadata.name || file.name || `Document-${Date.now()}`);
   formData.append("category", metadata.category || "other");
   formData.append("type", metadata.type || (file.type === "application/pdf" ? "pdf" : "image"));
+  
+  if (metadata.folder) {
+    formData.append("folder", metadata.folder);
+  }
   
   if (metadata.tags && Array.isArray(metadata.tags) && metadata.tags.length > 0) {
     formData.append("tags", JSON.stringify(metadata.tags));
@@ -129,6 +134,7 @@ export async function apiUpdateDocument(
     metadata?: any;
     isFavorite?: boolean;
     isArchived?: boolean;
+    folder?: string;
   }
 ) {
   const res = await fetch(`${API}/api/documents/${id}`, {
@@ -211,4 +217,40 @@ export async function apiUpdateProfile(data: { name?: string; avatar?: string })
   if (!res.ok) throw new Error("Failed to update profile");
   const responseData = await res.json();
   return responseData.data;
+}
+
+// Categories API
+export async function apiGetCategories() {
+  const res = await fetch(`${API}/api/categories`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!res.ok) throw new Error("Failed to fetch categories");
+  const data = await res.json();
+  return data.data || [];
+}
+
+export async function apiCreateCategory(data: { label: string; icon: string }) {
+  const res = await fetch(`${API}/api/categories`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) throw new Error("Failed to create category");
+  const responseData = await res.json();
+  return responseData.data;
+}
+
+export async function apiDeleteCategory(id: string) {
+  const res = await fetch(`${API}/api/categories/${id}`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  if (!res.ok) throw new Error("Failed to delete category");
+  return true;
 }

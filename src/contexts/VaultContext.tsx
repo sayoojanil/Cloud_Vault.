@@ -1,5 +1,5 @@
   import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
-  import { Document, DocumentCategory, ActivityLog, StorageStats } from '@/types/vault';
+  import { Document, DocumentCategory, ActivityLog, StorageStats, Category, DEFAULT_CATEGORIES } from '@/types/vault';
   import { useAuth } from './AuthContext';
   import {
     apiGetDocuments,
@@ -10,6 +10,9 @@
     apiToggleFavorite,
     apiGetActivities,
     apiGetStats,
+    apiGetCategories,
+    apiCreateCategory,
+    apiDeleteCategory,
   } from '@/lib/api';
   import { toast } from 'sonner';
   import { PDFDocument } from 'pdf-lib';
@@ -70,13 +73,17 @@
     documents: Document[];
     activities: ActivityLog[];
     stats: StorageStats;
+    categories: Category[];
     isLoading: boolean;
+    createCategory: (label: string, icon: string) => Promise<void>;
+    deleteCategory: (id: string) => Promise<void>;
     addDocument: (file: File, metadata?: {
       name?: string;
       category?: DocumentCategory;
       type?: string;
       tags?: string[];
       metadata?: any;
+      folder?: string;
     }) => Promise<void>;
     updateDocument: (id: string, updates: Partial<Document>) => Promise<void>;
     deleteDocument: (id: string) => Promise<void>;
@@ -94,6 +101,7 @@
     const { user, isAuthenticated } = useAuth();
     const [documents, setDocuments] = useState<Document[]>([]);
     const [activities, setActivities] = useState<ActivityLog[]>([]);
+    const [categories, setCategories] = useState<Category[]>(DEFAULT_CATEGORIES);
     const [stats, setStats] = useState<StorageStats>({
       used: 0,
       limit: 1024 * 1024 * 1024,
@@ -121,6 +129,7 @@
         fileUrl: doc.fileUrl,
         isArchived: doc.isArchived || false,
         isFavorite: doc.isFavorite || false,
+        folder: doc.folder || '',
       };
     };
 
@@ -134,6 +143,28 @@
         timestamp: new Date(activity.createdAt || activity.timestamp),
       };
     };
+
+    // Fetch categories from backend
+    const fetchCategories = useCallback(async () => {
+      if (!isAuthenticated || user?.isGuest) {
+        setCategories(DEFAULT_CATEGORIES);
+        return;
+      }
+      try {
+        const customCategories = await apiGetCategories();
+        const formattedCustom = customCategories.map((c: any) => ({
+          id: c._id || c.id,
+          key: c.key,
+          label: c.label,
+          icon: c.icon,
+          isCustom: true
+        }));
+        setCategories([...DEFAULT_CATEGORIES, ...formattedCustom]);
+      } catch (error) {
+        console.error('Error fetching categories:', error);
+        setCategories(DEFAULT_CATEGORIES);
+      }
+    }, [isAuthenticated, user?.isGuest]);
 
     // Fetch documents from backend
     const fetchDocuments = useCallback(async () => {
@@ -201,10 +232,12 @@
     // Load data when user changes
     useEffect(() => {
       if (user && !user.isGuest && isAuthenticated) {
+        fetchCategories();
         fetchDocuments();
         fetchActivities();
         fetchStats();
       } else if (user?.isGuest) {
+        setCategories(DEFAULT_CATEGORIES);
         setDocuments([]);
         setActivities([]);
         setStats({
@@ -217,7 +250,7 @@
       } else {
         setIsLoading(false);
       }
-    }, [user, isAuthenticated, fetchDocuments, fetchActivities, fetchStats]);
+    }, [user, isAuthenticated, fetchCategories, fetchDocuments, fetchActivities, fetchStats]);
 
     // Upload document to backend (which uploads to Cloudinary)
     const addDocument = useCallback(async (
@@ -228,6 +261,7 @@
         type?: string;
         tags?: string[];
         metadata?: any;
+        folder?: string;
       }
     ) => {
       if (!isAuthenticated || user?.isGuest) {
@@ -270,6 +304,7 @@
           type: type,
           tags: tags,
           metadata: docMetadata,
+          folder: metadata?.folder || '',
         });
 
         const transformedDoc = transformDocument(uploadedDoc);
@@ -390,6 +425,48 @@
       }
     }, [isAuthenticated, user?.isGuest]);
 
+    // Category management
+    const createCategory = useCallback(async (label: string, icon: string) => {
+      if (!isAuthenticated || user?.isGuest) {
+        toast.error('Please sign in to create categories');
+        return;
+      }
+      try {
+        const newCat = await apiCreateCategory({ label, icon });
+        const formatted = {
+          id: newCat._id || newCat.id,
+          key: newCat.key,
+          label: newCat.label,
+          icon: newCat.icon,
+          isCustom: true
+        };
+        setCategories(prev => [...prev, formatted]);
+        toast.success(`Category "${label}" created`);
+      } catch (error: any) {
+        console.error('Error creating category:', error);
+        toast.error('Failed to create category');
+        throw error;
+      }
+    }, [isAuthenticated, user?.isGuest]);
+
+    const deleteCategory = useCallback(async (id: string) => {
+      if (!isAuthenticated || user?.isGuest) {
+        toast.error('Please sign in to delete categories');
+        return;
+      }
+      try {
+        await apiDeleteCategory(id);
+        setCategories(prev => prev.filter(c => c.id !== id));
+        // Refresh documents because some might have been moved to 'other'
+        await fetchDocuments();
+        toast.success('Category deleted');
+      } catch (error: any) {
+        console.error('Error deleting category:', error);
+        toast.error('Failed to delete category');
+        throw error;
+      }
+    }, [isAuthenticated, user?.isGuest, fetchDocuments]);
+
     // Search documents (client-side filtering)
     const searchDocuments = useCallback((query: string): Document[] => {
       const lowerQuery = query.toLowerCase();
@@ -417,17 +494,21 @@
 
     // Refresh documents
     const refreshDocuments = useCallback(async () => {
+      await fetchCategories();
       await fetchDocuments();
       await fetchActivities();
       await fetchStats();
-    }, [fetchDocuments, fetchActivities, fetchStats]);
+    }, [fetchCategories, fetchDocuments, fetchActivities, fetchStats]);
 
     return (
       <VaultContext.Provider value={{
         documents,
         activities,
         stats,
+        categories,
         isLoading,
+        createCategory,
+        deleteCategory,
         addDocument,
         updateDocument,
         deleteDocument,

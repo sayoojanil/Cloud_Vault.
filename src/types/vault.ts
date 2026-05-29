@@ -13,6 +13,7 @@ export interface Document {
   fileUrl: string;
   isArchived: boolean;
   isFavorite: boolean;
+  folder?: string;
 }
 
 export interface DocumentMetadata {
@@ -22,15 +23,15 @@ export interface DocumentMetadata {
   documentNumber?: string;
 }
 
-export type DocumentCategory = 
-  | 'identity'
-  | 'financial'
-  | 'medical'
-  | 'insurance'
-  | 'legal'
-  | 'personal'
-  | 'travel'
-  | 'other';
+export type DocumentCategory = string;
+
+export interface Category {
+  id: string;
+  key: string;
+  label: string;
+  icon: string;
+  isCustom?: boolean;
+}
 
 export interface User {
   id: string;
@@ -58,24 +59,13 @@ export interface ActivityLog {
   timestamp: Date;
 }
 
-export const CATEGORY_LABELS: Record<DocumentCategory, string> = {
-  identity: 'Identity Documents',
-  financial: 'Financial Records',
-  medical: 'Medical Records',
-  insurance: 'Insurance Policies',
-  legal: 'Legal Documents',
-  personal: 'Personal Files',
-  travel: 'Travel Documents',
-  other: 'Other',
-};
-
-export const CATEGORY_ICONS: Record<DocumentCategory, string> = {
-  identity: 'User',
-  financial: 'CreditCard',
-  medical: 'Heart',
-  insurance: 'Shield',
-  legal: 'Scale',
-  personal: 'Folder',
-  travel: 'Plane',
-  other: 'File',
-};
+export const DEFAULT_CATEGORIES: Category[] = [
+  { id: 'default-identity', key: 'identity', label: 'Identity Documents', icon: 'User', isCustom: false },
+  { id: 'default-financial', key: 'financial', label: 'Financial Records', icon: 'CreditCard', isCustom: false },
+  { id: 'default-medical', key: 'medical', label: 'Medical Records', icon: 'Heart', isCustom: false },
+  { id: 'default-insurance', key: 'insurance', label: 'Insurance Policies', icon: 'Shield', isCustom: false },
+  { id: 'default-legal', key: 'legal', label: 'Legal Documents', icon: 'Scale', isCustom: false },
+  { id: 'default-personal', key: 'personal', label: 'Personal Files', icon: 'Folder', isCustom: false },
+  { id: 'default-travel', key: 'travel', label: 'Travel Documents', icon: 'Plane', isCustom: false },
+  { id: 'default-other', key: 'other', label: 'Other', icon: 'File', isCustom: false },
+];

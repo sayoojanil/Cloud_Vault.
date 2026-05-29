@@ -208,7 +208,7 @@ export default function Landing() {
                 className="flex flex-col sm:flex-row justify-center gap-4"
               >
                 <Link to="/dashboard">
-                  <Button size="lg" className="gap-2 px-8 rounded-full">
+                  <Button size="lg" className="gap-2 px-8 rounded-none">
                     <motion.span
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}

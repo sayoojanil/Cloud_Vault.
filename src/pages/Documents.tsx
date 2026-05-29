@@ -38,12 +38,13 @@ import {
   Camera,
   Share2
 } from 'lucide-react';
+import * as Icons from 'lucide-react';
 import { Header } from '@/components/layout/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useVault } from '@/contexts/VaultContext';
-import { Document, DocumentCategory, CATEGORY_LABELS } from '@/types/vault';
+import { Document, DocumentCategory } from '@/types/vault';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import {
@@ -81,20 +82,8 @@ import {
 import {
   Slider,
 } from '@/components/ui/slider';
-import { VerifyBadge } from "@/components/ui/verify-badge";
-
-
-const categoryIcons: Record<DocumentCategory, React.ComponentType<{ className?: string }>> = {
-  identity: User,
-  financial: CreditCard,
-  medical: Heart,
-  insurance: Shield,
-  legal: Scale,
-  personal: Folder,
-  travel: Plane,
-  other: File,
-};
-
+import { CreateCategoryDialog } from '@/components/CreateCategoryDialog';
+import { VerifyBadge } from '@/components/ui/verify-badge';
 const fileTypeIcons = {
   pdf: FileText,
   jpg: ImageIcon,
@@ -108,7 +97,9 @@ let lastTapTime = 0;
 
 export default function Documents() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const { documents, isLoading, deleteDocument, archiveDocument, toggleFavorite, updateDocument, addDocument } = useVault();
+  const { documents, categories, isLoading, deleteDocument, archiveDocument, toggleFavorite, updateDocument, addDocument } = useVault();
+
+  const [showCreateCategoryDialog, setShowCreateCategoryDialog] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
@@ -135,6 +126,8 @@ export default function Documents() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
 
+  const [currentFolder, setCurrentFolder] = useState<string>('');
+
   // Pending Upload states
   const [pendingUploadFile, setPendingUploadFile] = useState<window.File | null>(null);
   const [uploadFormData, setUploadFormData] = useState({
@@ -142,7 +135,8 @@ export default function Documents() {
     category: 'other' as DocumentCategory,
     notes: '',
     issuer: '',
-    tags: ''
+    tags: '',
+    folder: ''
   });
 
   useEffect(() => {
@@ -235,10 +229,11 @@ export default function Documents() {
       setPendingUploadFile(file);
       setUploadFormData({
         name: `Camera-${format(new Date(), 'yyyy-MM-dd-HHmm')}`,
-        category: 'other',
+        category: currentFolder ? (currentFolder.split('/')[0] as DocumentCategory) : 'other',
         notes: '',
         issuer: '',
-        tags: ''
+        tags: '',
+        folder: currentFolder ? currentFolder.split('/').slice(1).join('/') : ''
       });
       stopCamera();
       setIsCameraOpen(false);
@@ -261,6 +256,7 @@ export default function Documents() {
           notes: uploadFormData.notes,
           issuer: uploadFormData.issuer,
         },
+        folder: uploadFormData.folder,
       });
       uploadBellRef.current?.play().catch(() => {});
       toast.success('Document uploaded successfully', { id: toastId });
@@ -374,6 +370,144 @@ export default function Documents() {
     );
   }, [documents, selectedCategory, searchQuery, searchParams]);
 
+  // 🔹 Virtual Folder traversal and helpers
+  const currentFolderDocs = useMemo(() => {
+    if (searchQuery || searchParams.get('filter') === 'favorites' || selectedCategory) {
+      return filteredDocuments;
+    }
+    
+    if (currentFolder === '') {
+      return [];
+    }
+
+    if (currentFolder === 'all_files') {
+      return filteredDocuments;
+    }
+
+    const parts = currentFolder.split('/');
+    const currentCategory = parts[0];
+    const actualFolder = parts.slice(1).join('/');
+
+    return filteredDocuments.filter(doc => 
+      doc.category === currentCategory && 
+      (doc.folder || '') === actualFolder
+    );
+  }, [filteredDocuments, currentFolder, searchQuery, searchParams, selectedCategory]);
+
+  const currentSubfolders = useMemo(() => {
+    if (searchQuery || searchParams.get('filter') === 'favorites' || selectedCategory) {
+      return [];
+    }
+
+    if (currentFolder === 'all_files') {
+      return [];
+    }
+
+    if (currentFolder === '') {
+      return ['all_files', ...categories.map(c => c.key).sort()];
+    }
+
+    const parts = currentFolder.split('/');
+    const currentCategory = parts[0];
+    const actualFolder = parts.slice(1).join('/');
+
+    const subfoldersSet = new Set<string>();
+    documents.forEach(doc => {
+      if (doc.category !== currentCategory) return;
+      
+      const docFolder = doc.folder || '';
+      
+      if (actualFolder === '') {
+        if (docFolder !== '') {
+          const firstPart = docFolder.split('/')[0];
+          if (firstPart) subfoldersSet.add(`${currentCategory}/${firstPart}`);
+        }
+      } else {
+        if (docFolder.startsWith(actualFolder + '/')) {
+          const relativePath = docFolder.substring(actualFolder.length + 1);
+          const firstPart = relativePath.split('/')[0];
+          if (firstPart) subfoldersSet.add(`${currentFolder}/${firstPart}`);
+        }
+      }
+    });
+
+    return Array.from(subfoldersSet).sort();
+  }, [documents, categories, currentFolder, searchQuery, searchParams, selectedCategory]);
+
+  const existingFolders = useMemo(() => {
+    const foldersSet = new Set<string>();
+    documents.forEach(doc => {
+      if (doc.folder && doc.folder.trim() !== '') {
+        foldersSet.add(`${doc.category}/${doc.folder.trim()}`);
+      }
+    });
+    return Array.from(foldersSet).sort();
+  }, [documents]);
+
+  const getFolderFileCount = useCallback((folderPath: string) => {
+    if (folderPath === 'all_files') {
+      return documents.filter(d => !d.isArchived).length;
+    }
+
+    const parts = folderPath.split('/');
+    const cat = parts[0];
+    const actualFolder = parts.slice(1).join('/');
+    
+    return documents.filter(doc => {
+      if (doc.category !== cat) return false;
+      
+      const docFolder = doc.folder || '';
+      if (actualFolder === '') {
+        return true;
+      }
+      
+      return docFolder === actualFolder || docFolder.startsWith(actualFolder + '/');
+    }).length;
+  }, [documents]);
+
+  const renderBreadcrumbs = () => {
+    if (searchQuery || searchParams.get('filter') === 'favorites' || selectedCategory) {
+      return null;
+    }
+
+    const parts = currentFolder ? currentFolder.split('/') : [];
+    
+    return (
+      <div className="flex items-center gap-1.5 mb-6 text-sm text-muted-foreground overflow-x-auto py-1">
+        <button 
+          onClick={() => setCurrentFolder('')}
+          className="hover:text-foreground font-medium transition-colors"
+        >
+          Categories
+        </button>
+        {parts.map((part, index) => {
+          const path = parts.slice(0, index + 1).join('/');
+          let displayName = part;
+          if (index === 0) {
+            if (part === 'all_files') {
+              displayName = 'All Files';
+            } else {
+              const cat = categories.find(c => c.key === part);
+              if (cat) displayName = cat.label;
+            }
+          }
+          
+          return (
+            <div key={path} className="flex items-center gap-1.5">
+              <span>/</span>
+              <button 
+                onClick={() => setCurrentFolder(path)}
+                className="hover:text-foreground font-medium transition-colors max-w-[120px] truncate"
+              >
+                {displayName}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0 B';
     const k = 1024;
@@ -429,10 +563,11 @@ export default function Documents() {
       
       setUploadFormData({
         name: defaultName,
-        category: 'other',
+        category: currentFolder ? (currentFolder.split('/')[0] as DocumentCategory) : 'other',
         notes: '',
         issuer: '',
-        tags: ''
+        tags: '',
+        folder: currentFolder ? currentFolder.split('/').slice(1).join('/') : ''
       });
       return;
     }
@@ -473,10 +608,11 @@ export default function Documents() {
         try {
           await addDocument(file, {
             name: fileName,
-            category: 'other',
+            category: currentFolder ? (currentFolder.split('/')[0] as DocumentCategory) : 'other',
             type: fileType,
             tags: [],
             metadata: {},
+            folder: currentFolder ? currentFolder.split('/').slice(1).join('/') : '',
           });
           successfulUploads++;
         } catch (error: any) {
@@ -499,6 +635,79 @@ export default function Documents() {
       }
     } catch (error: any) {
       toast.error('Upload failed: ' + (error.message || 'Unknown error'), { id: toastId });
+    } finally {
+      setShowUploadDialog(false);
+    }
+  };
+
+  const handleFolderUpload = async (fileList: FileList | null) => {
+    if (!fileList || fileList.length === 0) return;
+    const files = Array.from(fileList);
+    
+    // Show loading toast
+    const toastId = toast.loading(`Uploading folder with ${files.length} files...`);
+    
+    let successfulUploads = 0;
+    let failedUploads = 0;
+    const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+
+    try {
+      for (const file of files) {
+        // Validate file type (if it has type; sometimes directories or hidden system files have no type, skip them)
+        if (file.type && !validTypes.includes(file.type)) {
+          continue;
+        }
+
+        // Validate file size (20MB limit)
+        const maxSize = 20 * 1024 * 1024; // 20MB
+        if (file.size > maxSize) {
+          failedUploads++;
+          continue;
+        }
+
+        // Extract virtual folder structure from webkitRelativePath
+        // e.g. "MyFolder/SubFolder/file.pdf"
+        const relativePath = file.webkitRelativePath || '';
+        const pathParts = relativePath.split('/');
+        let baseFolder = currentFolder ? currentFolder.split('/').slice(1).join('/') : '';
+        let uploadCategory = currentFolder ? (currentFolder.split('/')[0] as DocumentCategory) : 'other';
+        
+        if (pathParts.length > 1) {
+          const directoryParts = pathParts.slice(0, -1);
+          const relativeFolder = directoryParts.join('/');
+          baseFolder = baseFolder ? `${baseFolder}/${relativeFolder}` : relativeFolder;
+        }
+
+        const fileName = file.name || `Document-${Date.now()}`;
+        const fileType = file.type === 'application/pdf' ? 'pdf' : 'image';
+
+        try {
+          await addDocument(file, {
+            name: fileName,
+            category: uploadCategory,
+            type: fileType,
+            tags: [],
+            metadata: {},
+            folder: baseFolder,
+          });
+          successfulUploads++;
+        } catch (error) {
+          failedUploads++;
+          console.error('Folder file upload error:', error);
+        }
+      }
+
+      // Update the loading toast with result
+      if (successfulUploads > 0 && failedUploads === 0) {
+        uploadBellRef.current?.play().catch(() => {});
+        toast.success(`Successfully uploaded folder containing ${successfulUploads} files`, { id: toastId });
+      } else if (successfulUploads > 0 && failedUploads > 0) {
+        toast.warning(`Uploaded ${successfulUploads} files, ${failedUploads} failed`, { id: toastId });
+      } else if (successfulUploads === 0) {
+        toast.error('No files from the folder were uploaded successfully', { id: toastId });
+      }
+    } catch (error: any) {
+      toast.error('Folder upload failed: ' + (error.message || 'Unknown error'), { id: toastId });
     } finally {
       setShowUploadDialog(false);
     }
@@ -591,7 +800,7 @@ export default function Documents() {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="gap-2">
                   <Filter className="w-4 h-4" />
-                  {selectedCategory ? CATEGORY_LABELS[selectedCategory] : 'All Categories'}
+                  {selectedCategory ? categories.find(c => c.key === selectedCategory)?.label : 'All Categories'}
                   <ChevronDown className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
@@ -600,15 +809,20 @@ export default function Documents() {
                   All Categories
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                {(Object.keys(CATEGORY_LABELS) as DocumentCategory[]).map((cat) => {
-                  const Icon = categoryIcons[cat];
+                {categories.map((cat) => {
+                  const Icon = (Icons as any)[cat.icon] || Icons.Folder;
                   return (
-                    <DropdownMenuItem key={cat} onClick={() => setSelectedCategory(cat)}>
+                    <DropdownMenuItem key={cat.key} onClick={() => setSelectedCategory(cat.key)}>
                       <Icon className="w-4 h-4 mr-2" />
-                      {CATEGORY_LABELS[cat]}
+                      {cat.label}
                     </DropdownMenuItem>
                   );
                 })}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setShowCreateCategoryDialog(true)}>
+                  <Icons.Plus className="w-4 h-4 mr-2" />
+                  Create Category...
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
@@ -637,7 +851,7 @@ export default function Documents() {
           <div className="flex gap-2 mb-6">
             {selectedCategory && (
               <Badge variant="secondary" className="gap-1">
-                {CATEGORY_LABELS[selectedCategory]}
+                {categories.find(c => c.key === selectedCategory)?.label}
                 <button onClick={() => setSelectedCategory(null)}>
                   <X className="w-3 h-3" />
                 </button>
@@ -655,8 +869,10 @@ export default function Documents() {
           </div>
         )}
 
+        {renderBreadcrumbs()}
+
         {/* Documents Grid/List */}
-        {filteredDocuments.length === 0 ? (
+        {currentFolderDocs.length === 0 && currentSubfolders.length === 0 ? (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -679,9 +895,50 @@ export default function Documents() {
             className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           >
             <AnimatePresence>
-              {filteredDocuments.map((doc) => {
-                const CategoryIcon = categoryIcons[doc.category];
+              {currentSubfolders.map((folderPath) => {
+                let folderName = folderPath.split('/').pop() || folderPath;
+                let FolderIcon = Folder;
+
+                if (currentFolder === '') {
+                  if (folderPath === 'all_files') {
+                    folderName = 'All Files';
+                    FolderIcon = Icons.Files || Icons.FolderOpen;
+                  } else {
+                    const cat = categories.find(c => c.key === folderPath);
+                    if (cat) {
+                      folderName = cat.label;
+                      if ((Icons as any)[cat.icon]) {
+                        FolderIcon = (Icons as any)[cat.icon];
+                      }
+                    }
+                  }
+                }
+
+                return (
+                  <motion.div
+                    key={`folder-${folderPath}`}
+                    layout
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="vault-card-hover group cursor-pointer"
+                    onClick={() => setCurrentFolder(folderPath)}
+                  >
+                    <div className="p-6 flex flex-col items-center justify-center gap-3 aspect-[4/3] bg-vault-surface-hover/50">
+                      <FolderIcon className="w-16 h-16 text-blue-500 fill-blue-500/20" />
+                      <div className="text-center">
+                        <p className="font-semibold">{folderName}</p>
+                        <p className="text-xs text-muted-foreground">{getFolderFileCount(folderPath)} items</p>
+                      </div>
+                    </div>
+                  </motion.div>
+                );
+              })}
+              {currentFolderDocs.map((doc) => {
+                const docCat = categories.find(c => c.key === doc.category) || categories.find(c => c.key === 'other');
+                const CategoryIcon = (Icons as any)[docCat?.icon || 'Folder'] || Icons.Folder;
                 const FileIcon = fileTypeIcons[doc.fileType];
+                const catLabel = docCat?.label || 'Other';
 
                 return (
                   <motion.div
@@ -716,7 +973,7 @@ export default function Documents() {
                           </div>
                           <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
                             <CategoryIcon className="w-3 h-3" />
-                            <span>{CATEGORY_LABELS[doc.category]}</span>
+                            <span>{catLabel}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1">
@@ -798,9 +1055,46 @@ export default function Documents() {
             animate={{ opacity: 1 }}
             className="vault-card divide-y divide-border"
           >
-            {filteredDocuments.map((doc) => {
-              const CategoryIcon = categoryIcons[doc.category];
+            {currentSubfolders.map((folderPath) => {
+              let folderName = folderPath.split('/').pop() || folderPath;
+              let FolderIcon = Folder;
+
+              if (currentFolder === '') {
+                if (folderPath === 'all_files') {
+                  folderName = 'All Files';
+                  FolderIcon = Icons.Files || Icons.FolderOpen;
+                } else {
+                  const cat = categories.find(c => c.key === folderPath);
+                  if (cat) {
+                    folderName = cat.label;
+                    if ((Icons as any)[cat.icon]) {
+                      FolderIcon = (Icons as any)[cat.icon];
+                    }
+                  }
+                }
+              }
+
+              return (
+                <div 
+                  key={`folder-${folderPath}`} 
+                  className="flex items-center gap-4 p-4 hover:bg-vault-surface-hover transition-colors cursor-pointer"
+                  onClick={() => setCurrentFolder(folderPath)}
+                >
+                  <div className="w-10 h-10 rounded bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                    <FolderIcon className="w-5 h-5 text-blue-500 fill-blue-500/20" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-sm truncate">{folderName}</p>
+                    <p className="text-xs text-muted-foreground mt-1">{getFolderFileCount(folderPath)} items</p>
+                  </div>
+                </div>
+              );
+            })}
+            {currentFolderDocs.map((doc) => {
+              const docCat = categories.find(c => c.key === doc.category) || categories.find(c => c.key === 'other');
+              const CategoryIcon = (Icons as any)[docCat?.icon || 'Folder'] || Icons.Folder;
               const FileIcon = fileTypeIcons[doc.fileType];
+              const catLabel = docCat?.label || 'Other';
 
               return (
                 <div 
@@ -819,7 +1113,7 @@ export default function Documents() {
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                       <span className="flex items-center gap-1">
                         <CategoryIcon className="w-3 h-3" />
-                        {CATEGORY_LABELS[doc.category]}
+                        {catLabel}
                       </span>
                       <span>{formatBytes(doc.size)}</span>
                       <span>{format(new Date(doc.uploadedAt), 'MMM d, yyyy')}</span>
@@ -928,22 +1222,36 @@ export default function Documents() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label>Category</Label>
-                  <Select
-                    value={uploadFormData.category}
-                    onValueChange={(value) => setUploadFormData({...uploadFormData, category: value as DocumentCategory})}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select category" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(Object.keys(CATEGORY_LABELS) as DocumentCategory[]).map((cat) => (
-                        <SelectItem key={cat} value={cat}>
-                          {CATEGORY_LABELS[cat]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <div className="flex gap-2 items-end">
+                    <div className="flex-1 space-y-2">
+                      <Label>Category</Label>
+                      <Select
+                        value={uploadFormData.category}
+                        onValueChange={(value) => setUploadFormData({...uploadFormData, category: value})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select category" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {categories.map((cat) => (
+                            <SelectItem key={cat.key} value={cat.key}>
+                              {cat.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button 
+                      type="button" 
+                      variant="outline" 
+                      size="icon" 
+                      className="h-10 w-10 flex-shrink-0"
+                      onClick={() => setShowCreateCategoryDialog(true)}
+                      title="Create custom category"
+                    >
+                      <Icons.Plus className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label>Issuer</Label>
@@ -1088,7 +1396,9 @@ export default function Documents() {
                   <div className="flex items-center gap-2 text-sm">
                     <Tag className="w-4 h-4 text-muted-foreground" />
                     <span className="text-muted-foreground">Category:</span>
-                    <span className="font-medium">{CATEGORY_LABELS[selectedDocument.category]}</span>
+                    <span className="font-medium">
+                      {categories.find(c => c.key === selectedDocument.category)?.label || selectedDocument.category}
+                    </span>
                   </div>
                   <div className="flex items-center gap-2 text-sm">
                     <Calendar className="w-4 h-4 text-muted-foreground" />
@@ -1193,18 +1503,30 @@ export default function Documents() {
                 <Label htmlFor="name">Name</Label>
                 <Input id="name" name="name" defaultValue={selectedDocument.name} className="mt-1.5" />
               </div>
-              <div>
-                <Label htmlFor="category">Category</Label>
-                <Select name="category" defaultValue={selectedDocument.category}>
-                  <SelectTrigger className="mt-1.5">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(CATEGORY_LABELS) as DocumentCategory[]).map((cat) => (
-                      <SelectItem key={cat} value={cat}>{CATEGORY_LABELS[cat]}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              <div className="flex gap-2 items-end">
+                <div className="flex-1">
+                  <Label htmlFor="category">Category</Label>
+                  <Select name="category" defaultValue={selectedDocument.category}>
+                    <SelectTrigger className="mt-1.5">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.map((cat) => (
+                        <SelectItem key={cat.key} value={cat.key}>{cat.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  size="icon" 
+                  className="h-10 w-10 flex-shrink-0"
+                  onClick={() => setShowCreateCategoryDialog(true)}
+                  title="Create custom category"
+                >
+                  <Icons.Plus  className="w-4 h-4" />
+                </Button>
               </div>
               <div>
                 <Label htmlFor="tags">Tags (comma-separated)</Label>
@@ -1485,6 +1807,11 @@ export default function Documents() {
           </div>
         </DialogContent>
       </Dialog>
+
+      <CreateCategoryDialog
+        open={showCreateCategoryDialog}
+        onOpenChange={setShowCreateCategoryDialog}
+      />
     </div>
   );
 }

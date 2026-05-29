@@ -22,12 +22,13 @@ import {
   Calendar
 } from 'lucide-react';
 import { Header } from '@/components/layout/Header';
+import * as Icons from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useVault } from '@/contexts/VaultContext';
-import { DocumentCategory, CATEGORY_LABELS } from '@/types/vault';
+import { DocumentCategory } from '@/types/vault';
 import { format, formatDistanceToNow, isAfter, addDays } from 'date-fns';
 import { CardSkeleton } from '@/components/ui/skeleton-custom';
 import { useState } from 'react';
@@ -43,16 +44,7 @@ import {
 
 document.title="Dashboard";
 
-const categoryIcons: Record<DocumentCategory, React.ComponentType<{ className?: string }>> = {
-  identity: User,
-  financial: CreditCard,
-  medical: Heart,
-  insurance: Shield,
-  legal: Scale,
-  personal: Folder,
-  travel: Plane,
-  other: File,
-};
+
 
 // Note interface
 interface Note {
@@ -80,7 +72,7 @@ export function VerifyBadge({ verified }: { verified?: boolean }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
-  const { documents, activities, stats, isLoading } = useVault();
+  const { documents, activities, stats, isLoading, categories } = useVault();
   const [notes, setNotes] = useState<Note[]>(() => {
     // Load notes from localStorage
     const savedNotes = localStorage.getItem('dashboard-notes');
@@ -131,25 +123,22 @@ export default function Dashboard() {
 
   // Calculate category counts from documents
   const getCategoryCounts = () => {
-    const categoryCounts: Record<DocumentCategory, number> = {
-      identity: 0,
-      financial: 0,
-      medical: 0,
-      insurance: 0,
-      legal: 0,
-      personal: 0,
-      travel: 0,
-      other: 0
-    };
+    const categoryCounts: Record<string, number> = {};
+
+    // Initialize counts for all known categories
+    categories.forEach(cat => {
+      categoryCounts[cat.key] = 0;
+    });
 
     // Filter out archived documents
     const activeDocuments = documents.filter(d => !d.isArchived);
     
     // Count documents per category
     activeDocuments.forEach(doc => {
-      if (categoryCounts[doc.category] !== undefined) {
-        categoryCounts[doc.category] += 1;
+      if (categoryCounts[doc.category] === undefined) {
+        categoryCounts[doc.category] = 0;
       }
+      categoryCounts[doc.category] += 1;
     });
 
     return categoryCounts;
@@ -335,14 +324,14 @@ export default function Dashboard() {
               </Link>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              {(Object.keys(CATEGORY_LABELS) as DocumentCategory[]).map((category) => {
-                const Icon = categoryIcons[category];
-                const count = categoryCounts[category];
+              {categories.map((cat) => {
+                const Icon = (Icons as any)[cat.icon] || Icons.Folder;
+                const count = categoryCounts[cat.key] || 0;
                 
                 return (
                   <Link
-                    key={category}
-                    to={`/documents?category=${category}`}
+                    key={cat.key}
+                    to={`/documents?category=${cat.key}`}
                     className="vault-card-hover p-4 text-center"
                   >
                     <div className="relative mx-auto mb-2 w-fit">
@@ -353,7 +342,7 @@ export default function Dashboard() {
                         </span>
                       )}
                     </div>
-                    <p className="text-sm font-medium truncate">{CATEGORY_LABELS[category]}</p>
+                    <p className="text-sm font-medium truncate">{cat.label}</p>
                     <p className="text-xs text-muted-foreground">{count} file{count !== 1 ? 's' : ''}</p>
                   </Link>
                 );
@@ -480,7 +469,8 @@ export default function Dashboard() {
             ) : (
               <div className="divide-y divide-border">
                 {expiringDocuments.slice(0, 3).map((doc) => {
-                  const CategoryIcon = categoryIcons[doc.category];
+                  const catIconName = categories.find(c => c.key === doc.category)?.icon || 'File';
+                  const CategoryIcon = (Icons as any)[catIconName] || Icons.File;
                   const expiryDate = new Date(doc.metadata.expiryDate!);
                   const daysUntilExpiry = Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
                   
@@ -542,7 +532,8 @@ export default function Dashboard() {
             <div className="vault-card">
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 p-4">
                 {archivedDocuments.slice(0, 3).map((doc) => {
-                  const CategoryIcon = categoryIcons[doc.category];
+                  const catIconName = categories.find(c => c.key === doc.category)?.icon || 'File';
+                  const CategoryIcon = (Icons as any)[catIconName] || Icons.File;
                   return (
                     <Link
                       key={doc.id}
@@ -556,7 +547,7 @@ export default function Dashboard() {
                         <p className="text-sm font-medium truncate">{doc.name}</p>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="secondary" className="text-xs">
-                            {CATEGORY_LABELS[doc.category]}
+                            {categories.find(c => c.key === doc.category)?.label || doc.category}
                           </Badge>
                           <p className="text-xs text-muted-foreground">
                             Archived {formatDistanceToNow(new Date(doc.metadata.archivedAt || doc.updatedAt), { addSuffix: true })}
@@ -606,7 +597,8 @@ export default function Dashboard() {
                 </div>
               ) : (
                 recentDocuments.map((doc) => {
-                  const CategoryIcon = categoryIcons[doc.category];
+                  const catIconName = categories.find(c => c.key === doc.category)?.icon || 'File';
+                  const CategoryIcon = (Icons as any)[catIconName] || Icons.File;
                   return (
                     <Link
                       key={doc.id}
