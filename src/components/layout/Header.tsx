@@ -142,7 +142,7 @@ export function Header() {
               transition={{ duration: 0.5 }}
             >
               <Link to={user ? '/dashboard' : '/'}>
-                <Logo />
+                <img src="/cloudvault_logo.png" alt="CloudVault" className="h-24 w-auto" />
               </Link>
             </motion.div>
 
