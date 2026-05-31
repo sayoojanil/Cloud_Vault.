@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Logo } from '@/components/ui/Logo';
 import { useAuth } from '@/contexts/AuthContext';
-import { LogOut, UserRound, Menu, X, Search, Bell, ChevronDown } from 'lucide-react';
+import { LogOut, UserRound, Menu, X, Search, Bell, ChevronDown, Moon, Sun, Laptop } from 'lucide-react';
 import { useState, useEffect, useRef } from 'react';
 import {
   DropdownMenu,
@@ -28,6 +28,57 @@ export function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  type Theme = 'light' | 'dark' | 'system';
+  const [theme, setTheme] = useState<Theme>(() => {
+    if (typeof window === 'undefined') return 'system';
+    return (localStorage.getItem('theme') as Theme) || 'system';
+  });
+
+  const applyTheme = (targetTheme: Theme) => {
+    const root = document.documentElement;
+    root.classList.remove('light', 'dark');
+    
+    if (targetTheme === 'system') {
+      const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+      root.classList.add(systemTheme);
+    } else {
+      root.classList.add(targetTheme);
+    }
+    
+    localStorage.setItem('theme', targetTheme);
+    window.dispatchEvent(new Event('themeChanged'));
+  };
+
+  const handleThemeToggle = (newTheme: Theme) => {
+    setTheme(newTheme);
+    applyTheme(newTheme);
+    toast.success(`Theme changed to ${newTheme}`);
+  };
+
+  // Sync theme when it is updated elsewhere (like Settings page or system preference)
+  useEffect(() => {
+    const handleThemeChange = () => {
+      const currentTheme = (localStorage.getItem('theme') as Theme) || 'system';
+      setTheme(currentTheme);
+    };
+
+    window.addEventListener('themeChanged', handleThemeChange);
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    const handleSystemThemeChange = () => {
+      if (theme === 'system') {
+        applyTheme('system');
+      }
+    };
+    
+    mediaQuery.addEventListener('change', handleSystemThemeChange);
+
+    return () => {
+      window.removeEventListener('themeChanged', handleThemeChange);
+      mediaQuery.removeEventListener('change', handleSystemThemeChange);
+    };
+  }, [theme]);
   const [logoutDialogOpen, setLogoutDialogOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -179,6 +230,17 @@ export function Header() {
                       Dashboard
                     </Link>
                   </motion.div>
+                  {user.isAdmin && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3, delay: 0.05 }}
+                    >
+                      <Link to="/admin" className="text-sm font-semibold text-rose-400 hover:text-rose-300 transition-colors hover:scale-105 active:scale-95">
+                        Admin
+                      </Link>
+                    </motion.div>
+                  )}
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
@@ -208,12 +270,22 @@ export function Header() {
                   >
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="sm" className="gap-2 group hover:scale-105 active:scale-95 transition-transform">
-                          {/* <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-purple-500 flex items-center justify-center text-white text-sm font-semibold">
-                            {user.name.charAt(0).toUpperCase()}
-                          </div> */}
-                          <span className="hidden sm:inline">{user.name}</span>
-                          <ChevronDown className="w-4 h-4 opacity-50 group-hover:opacity-50 transition-opacity" />
+                        <Button variant="ghost" size="sm" className="gap-2 group hover:scale-105 active:scale-95 transition-transform flex items-center pl-1.5 pr-2 py-1.5 h-auto rounded-full bg-accent/20 border border-border/40 hover:bg-accent/40">
+                          <div className="relative w-8 h-8 rounded-full overflow-hidden border border-border shadow-inner group-hover:border-primary/50 transition-colors flex-shrink-0">
+                            {user.avatar ? (
+                              <img
+                                src={user.avatar}
+                                alt={user.name}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center text-white text-xs font-semibold">
+                                {user.name.charAt(0).toUpperCase()}
+                              </div>
+                            )}
+                          </div>
+                          <span className="hidden sm:inline font-medium text-foreground/90 group-hover:text-foreground transition-colors max-w-[120px] truncate">{user.name}</span>
+                          <ChevronDown className="w-4 h-4 opacity-50 group-hover:opacity-80 transition-opacity flex-shrink-0" />
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-48">
@@ -223,11 +295,62 @@ export function Header() {
                             Profile
                           </Link>
                         </DropdownMenuItem>
+                        {user.isAdmin && (
+                          <DropdownMenuItem asChild>
+                            <Link to="/admin" className="flex items-center gap-2 text-rose-400 focus:text-rose-400/90 font-medium">
+                              Admin Dashboard
+                            </Link>
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem asChild>
                           {/* <Link to="/settings" className="flex items-center gap-2">
                             Settings
                           </Link> */}
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <div className="flex flex-col gap-1 px-2 py-1.5 text-xs text-muted-foreground">
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 font-medium">
+                              {theme === 'dark' ? <Moon className="w-3.5 h-3.5 text-primary" /> : theme === 'light' ? <Sun className="w-3.5 h-3.5 text-primary" /> : <Laptop className="w-3.5 h-3.5 text-primary" />}
+                              Theme
+                            </span>
+                            <div className="flex items-center gap-0.5 bg-accent/40 rounded-full p-0.5 border border-border/30">
+                              <button
+                                type="button"
+                                onClick={() => handleThemeToggle('light')}
+                                className={cn(
+                                  "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                                  theme === 'light' && "bg-background text-primary shadow-sm"
+                                )}
+                                title="Light Mode"
+                              >
+                                <Sun className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleThemeToggle('dark')}
+                                className={cn(
+                                  "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                                  theme === 'dark' && "bg-background text-primary shadow-sm"
+                                )}
+                                title="Dark Mode"
+                              >
+                                <Moon className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleThemeToggle('system')}
+                                className={cn(
+                                  "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                                  theme === 'system' && "bg-background text-primary shadow-sm"
+                                )}
+                                title="System Preference"
+                              >
+                                <Laptop className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={confirmLogout} 
@@ -340,6 +463,31 @@ export function Header() {
                   </>
                 ) : (
                   <>
+                    {/* User Info with Avatar for Mobile Navigation */}
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.3 }}
+                      className="flex items-center gap-3 px-3 py-3 border-b border-border/40 mb-2 bg-accent/10 rounded-xl"
+                    >
+                      <div className="relative w-10 h-10 rounded-full overflow-hidden border border-border shadow-inner flex-shrink-0">
+                        {user.avatar ? (
+                          <img
+                            src={user.avatar}
+                            alt={user.name}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center text-white text-sm font-semibold">
+                            {user.name.charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-semibold text-foreground truncate">{user.name}</span>
+                        <span className="text-xs text-muted-foreground truncate">{user.email}</span>
+                      </div>
+                    </motion.div>
                     {/* Mobile Search */}
                     <motion.form
                       initial={{ scale: 0.9, opacity: 0 }}
@@ -373,6 +521,21 @@ export function Header() {
                         Dashboard
                       </Link>
                     </motion.div>
+                    {user.isAdmin && (
+                      <motion.div
+                        initial={{ x: -20, opacity: 0 }}
+                        animate={{ x: 0, opacity: 1 }}
+                        transition={{ duration: 0.2, delay: 0.05 }}
+                      >
+                        <Link 
+                          to="/admin" 
+                          className="py-2 text-rose-400 hover:text-rose-300 transition-colors flex items-center gap-2 font-semibold"
+                          onClick={() => setMobileMenuOpen(false)}
+                        >
+                          Admin Dashboard
+                        </Link>
+                      </motion.div>
+                    )}
                     <motion.div
                       initial={{ x: -20, opacity: 0 }}
                       animate={{ x: 0, opacity: 1 }}
@@ -404,13 +567,55 @@ export function Header() {
                       animate={{ x: 0, opacity: 1 }}
                       transition={{ duration: 0.2, delay: 0.3 }}
                     >
-                      <Link 
-                        to="/settings" 
+                      <Link
+                        to="/settings"
                         className="py-2 text-muted-foreground hover:text-foreground transition-colors flex items-center gap-2"
                         onClick={() => setMobileMenuOpen(false)}
                       >
                         Settings
                       </Link>
+                      {/* Theme Toggle in Mobile Menu */}
+                      <div className="flex items-center justify-between px-3 py-2 border-t border-border/40 mt-2">
+                        <span className="flex items-center gap-1.5 font-medium text-foreground">
+                          {theme === 'dark' ? <Moon className="w-3.5 h-3.5 text-primary" /> : theme === 'light' ? <Sun className="w-3.5 h-3.5 text-primary" /> : <Laptop className="w-3.5 h-3.5 text-primary" />}
+                          Theme
+                        </span>
+                        <div className="flex items-center gap-0.5 bg-accent/40 rounded-full p-0.5 border border-border/30">
+                          <button
+                            type="button"
+                            onClick={() => handleThemeToggle('light')}
+                            className={cn(
+                              "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                              theme === 'light' && "bg-background text-primary shadow-sm"
+                            )}
+                            title="Light Mode"
+                          >
+                            <Sun className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleThemeToggle('dark')}
+                            className={cn(
+                              "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                              theme === 'dark' && "bg-background text-primary shadow-sm"
+                            )}
+                            title="Dark Mode"
+                          >
+                            <Moon className="w-3 h-3" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleThemeToggle('system')}
+                            className={cn(
+                              "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                              theme === 'system' && "bg-background text-primary shadow-sm"
+                            )}
+                            title="System Preference"
+                          >
+                            <Laptop className="w-3 h-3" />
+                          </button>
+                        </div>
+                      </div>
                     </motion.div>
                     <motion.div
                       initial={{ x: -20, opacity: 0 }}

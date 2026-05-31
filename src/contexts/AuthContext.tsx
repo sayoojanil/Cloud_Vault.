@@ -12,11 +12,17 @@ import React, {
 export interface User {
   id: string;
   name: string;
+  gender?: string;
+  dob?: string;
   phone: string;
   email: string;
+  avatar?: string | null;
+  avatarPublicId?: string | null;
+  createdAt?: string;
   storageUsed: number;
   storageLimit: number;
   isGuest: boolean;
+  isAdmin?: boolean;
 }
 
 interface AuthContextType {

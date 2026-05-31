@@ -19,7 +19,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
             "text-white",
 
           success:
-            "border-green-600 bg-green-600 text-white dark:text-green-400",
+            "border-green-600 bg-green-600 text-white dark:text-white",
 
           error:
             "border-red-600 bg-red-600 text-white dark:text-green-400",

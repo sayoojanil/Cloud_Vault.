@@ -204,7 +204,7 @@ export async function apiGetStats() {
 }
 
 // User API
-export async function apiUpdateProfile(data: { name?: string; avatar?: string }) {
+export async function apiUpdateProfile(data: { name?: string; avatar?: string; phone?: string; gender?: string; dob?: string }) {
   const res = await fetch(`${API}/api/user/profile`, {
     method: "PUT",
     headers: {
@@ -215,6 +215,50 @@ export async function apiUpdateProfile(data: { name?: string; avatar?: string })
   });
 
   if (!res.ok) throw new Error("Failed to update profile");
+  const responseData = await res.json();
+  return responseData.data;
+}
+
+export async function apiUploadAvatar(file: File) {
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const res = await fetch(`${API}/api/user/avatar`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let errorMessage = "Profile picture upload failed";
+    try {
+      const error = await res.json();
+      errorMessage = error.message || errorMessage;
+    } catch (e) {
+      // Ignore
+    }
+    throw new Error(errorMessage);
+  }
+  const responseData = await res.json();
+  return responseData.data;
+}
+
+export async function apiDeleteAvatar() {
+  const res = await fetch(`${API}/api/user/avatar`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  if (!res.ok) {
+    let errorMessage = "Profile picture removal failed";
+    try {
+      const error = await res.json();
+      errorMessage = error.message || errorMessage;
+    } catch (e) {
+      // Ignore
+    }
+    throw new Error(errorMessage);
+  }
   const responseData = await res.json();
   return responseData.data;
 }
@@ -254,3 +298,73 @@ export async function apiDeleteCategory(id: string) {
   if (!res.ok) throw new Error("Failed to delete category");
   return true;
 }
+
+// Admin API
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  storageUsed: number;
+  storageLimit: number;
+  isGuest: boolean;
+  isAdmin: boolean;
+  createdAt: string;
+}
+
+export interface AdminDocument {
+  id: string;
+  name: string;
+  type: string;
+  category: string;
+  fileType: string;
+  size: number;
+  tags: string[];
+  metadata: any;
+  thumbnailUrl: string | null;
+  fileUrl: string;
+  isArchived: boolean;
+  isFavorite: boolean;
+  folder: string;
+  verificationStatus: 'pending' | 'verification_sent' | 'verified';
+  createdAt: string;
+}
+
+export async function apiAdminGetUsers(): Promise<AdminUser[]> {
+  const res = await fetch(`${API}/api/admin/users`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!res.ok) throw new Error("Failed to fetch admin users list");
+  const responseData = await res.json();
+  return responseData.data || [];
+}
+
+export async function apiAdminGetUserDetails(id: string): Promise<{ user: AdminUser; documents: AdminDocument[] }> {
+  const res = await fetch(`${API}/api/admin/users/${id}`, {
+    headers: getAuthHeaders(),
+  });
+
+  if (!res.ok) throw new Error("Failed to fetch user details");
+  const responseData = await res.json();
+  return responseData.data;
+}
+
+export async function apiAdminUpdateDocumentStatus(
+  id: string,
+  status: 'pending' | 'verification_sent' | 'verified'
+): Promise<{ id: string; verificationStatus: string }> {
+  const res = await fetch(`${API}/api/admin/documents/${id}/status`, {
+    method: "PATCH",
+    headers: {
+      ...getAuthHeaders(),
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ status }),
+  });
+
+  if (!res.ok) throw new Error("Failed to update verification status");
+  const responseData = await res.json();
+  return responseData.data;
+}
+

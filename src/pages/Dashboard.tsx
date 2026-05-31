@@ -26,11 +26,15 @@ import * as Icons from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
+
+
 import { useAuth } from '@/contexts/AuthContext';
 import { useVault } from '@/contexts/VaultContext';
 import { DocumentCategory } from '@/types/vault';
 import { format, formatDistanceToNow, isAfter, addDays } from 'date-fns';
 import { CardSkeleton } from '@/components/ui/skeleton-custom';
+import { useNavigate } from 'react-router-dom';
+import React from 'react';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -55,20 +59,6 @@ interface Note {
   color?: string;
 }
 
-export function VerifyBadge({ verified }: { verified?: boolean }) {
-  if (!verified) return null;
-
-  return (
-    <Badge
-      variant="link"
-      className="gap-1 text-xs border-none bg-green-500 text-white"
-      
-    >
-      Encrypted
-      <CircleCheck className="w-4 h-4" />
-    </Badge>
-  );
-}
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -81,8 +71,16 @@ export default function Dashboard() {
       date: new Date(note.date)
     })) : [];
   });
-  const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
+  const navigate = useNavigate();
+
   const [newNote, setNewNote] = useState({ title: '', content: '' });
+  const [isNoteDialogOpen, setIsNoteDialogOpen] = useState(false);
+
+  const handleAllDocsClick = () => {
+    navigate('/documents');
+  };
+
+
 
   // Save notes to localStorage
   const saveNotes = (updatedNotes: Note[]) => {
@@ -227,18 +225,18 @@ export default function Dashboard() {
             </div>
           </Link>
           
-          <Link to="/documents" className="vault-card-hover p-4 flex items-center gap-3">
+          <div className="vault-card-hover p-4 flex items-center gap-3 cursor-pointer" onClick={handleAllDocsClick}>
             <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
               <FolderOpen className="w-5 h-5 text-secondary-foreground" />
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2">
                 <p className="font-medium text-xs">All Documents</p>
-                <VerifyBadge verified={user?.verified || activeDocumentCount > 0} />
+                
               </div>
               <p className="text-xs text-muted-foreground">{activeDocumentCount} document{activeDocumentCount !== 1 ? 's' : ''}</p>
             </div>
-          </Link>
+          </div>
           
           <Link to="/documents?filter=favorites" className="vault-card-hover p-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-lg bg-secondary flex items-center justify-center">
@@ -613,7 +611,6 @@ export default function Dashboard() {
   <p className="text-sm font-medium truncate max-w-[160px] sm:max-w-[200px]">
     {doc.name}
   </p>
-  {doc.verified && <VerifyBadge verified={true} />}
 </div>
                         <p className="text-xs text-muted-foreground">
                           {formatBytes(doc.size)} • {format(new Date(doc.uploadedAt), 'MMM d, yyyy')}

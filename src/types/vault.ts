@@ -37,11 +37,15 @@ export interface User {
   id: string;
   email: string;
   name: string;
-  avatar?: string;
+  avatar?: string | null;
+  avatarPublicId?: string | null;
   createdAt: Date;
   storageUsed: number;
   storageLimit: number;
   isGuest: boolean;
+  phone?: string;
+  gender?: string;
+  dob?: Date;
 }
 
 export interface StorageStats {

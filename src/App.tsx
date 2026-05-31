@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { VaultProvider } from "@/contexts/VaultContext";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
+import { RequireAdmin } from "@/components/auth/RequireAdmin";
 import RouteTitle from "@/components/RouteTitle";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
@@ -16,6 +17,7 @@ import Documents from "./pages/Documents";
 import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
+import AdminDashboard from "./pages/AdminDashboard";
 
 const queryClient = new QueryClient();
 
@@ -107,6 +109,17 @@ const App = () => (
                       <Settings />
                     </RouteTitle>
                   </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/admin"
+                element={
+                  <RequireAdmin>
+                    <RouteTitle title="CloudVault | Admin Dashboard">
+                      <AdminDashboard />
+                    </RouteTitle>
+                  </RequireAdmin>
                 }
               />
 
