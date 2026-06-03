@@ -39,6 +39,8 @@ export interface User {
   name: string;
   avatar?: string | null;
   avatarPublicId?: string | null;
+  adharImage?: string | null;
+  adharImagePublicId?: string | null;
   createdAt: Date;
   storageUsed: number;
   storageLimit: number;

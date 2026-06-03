@@ -42,7 +42,7 @@ const App = () => (
               <Route
                 path="/login"
                 element={
-                  <RouteTitle title="Login ">
+                  <RouteTitle title="Login Page">
                     <Login />
                   </RouteTitle>
                 }
@@ -51,7 +51,7 @@ const App = () => (
               <Route
                 path="/signup"
                 element={
-                  <RouteTitle title="Signup ">
+                  <RouteTitle title="CloudVault | Signup ">
                     <Signup />
                   </RouteTitle>
                 }

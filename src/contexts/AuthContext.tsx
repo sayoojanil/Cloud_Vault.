@@ -18,6 +18,8 @@ export interface User {
   email: string;
   avatar?: string | null;
   avatarPublicId?: string | null;
+  adharImage?: string | null;
+  adharImagePublicId?: string | null;
   createdAt?: string;
   storageUsed: number;
   storageLimit: number;
@@ -29,7 +31,7 @@ interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<boolean>;
-  signup: (name: string, email: string, password: string) => Promise<boolean>;
+  signup: (name: string, email: string, password: string, adharImage?: File | null) => Promise<boolean>;
   logout: () => void;
   loginAsGuest: () => void;
   updateUser: (userData: Partial<User>) => void;
@@ -141,14 +143,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
      SIGNUP
   --------------------------------------------- */
   const signup = useCallback(
-    async (name: string, email: string, password: string): Promise<boolean> => {
+    async (name: string, email: string, password: string, adharImage?: File | null): Promise<boolean> => {
       try {
         setIsLoading(true);
 
+        // Use FormData to support file upload
+        const formData = new FormData();
+        formData.append("name", name);
+        formData.append("email", email);
+        formData.append("password", password);
+        if (adharImage) {
+          formData.append("adharImage", adharImage);
+        }
+
         const res = await fetch(SIGNUP_URL, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name, email, password }),
+          body: formData,
         });
 
         if (!res.ok) {

@@ -203,7 +203,26 @@ export async function apiGetStats() {
   return data.data;
 }
 
-// User API
+// OCR helper for Aadhaar image using tesseract.js
+import Tesseract from 'tesseract.js';
+
+/**
+ * Extract text from an Aadhaar image using OCR.
+ * Returns plain extracted text; caller can parse for Aadhaar number.
+ */
+export async function extractAadhaarText(file: File): Promise<string> {
+  // Convert File to Blob URL for tesseract.js
+  const imageUrl = URL.createObjectURL(file);
+  try {
+    const { data: { text } } = await Tesseract.recognize(imageUrl, 'eng', {
+      logger: m => console.log(m), // optional progress logger
+    });
+    return text;
+  } finally {
+    URL.revokeObjectURL(imageUrl);
+  }
+}
+
 export async function apiUpdateProfile(data: { name?: string; avatar?: string; phone?: string; gender?: string; dob?: string }) {
   const res = await fetch(`${API}/api/user/profile`, {
     method: "PUT",
@@ -251,6 +270,50 @@ export async function apiDeleteAvatar() {
 
   if (!res.ok) {
     let errorMessage = "Profile picture removal failed";
+    try {
+      const error = await res.json();
+      errorMessage = error.message || errorMessage;
+    } catch (e) {
+      // Ignore
+    }
+    throw new Error(errorMessage);
+  }
+  const responseData = await res.json();
+  return responseData.data;
+}
+
+export async function apiUploadAdhar(file: File) {
+  const formData = new FormData();
+  formData.append("adharImage", file);
+
+  const res = await fetch(`${API}/api/user/adhar`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: formData,
+  });
+
+  if (!res.ok) {
+    let errorMessage = "Aadhaar image upload failed";
+    try {
+      const error = await res.json();
+      errorMessage = error.message || errorMessage;
+    } catch (e) {
+      // Ignore
+    }
+    throw new Error(errorMessage);
+  }
+  const responseData = await res.json();
+  return responseData.data;
+}
+
+export async function apiDeleteAdhar() {
+  const res = await fetch(`${API}/api/user/adhar`, {
+    method: "DELETE",
+    headers: getAuthHeaders(),
+  });
+
+  if (!res.ok) {
+    let errorMessage = "Aadhaar image removal failed";
     try {
       const error = await res.json();
       errorMessage = error.message || errorMessage;

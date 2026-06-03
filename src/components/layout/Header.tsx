@@ -168,7 +168,7 @@ export function Header() {
                     transition={{ duration: 0.3, delay: 0.4 }}
                   >
                     <Link to="/signup">
-                      <Button size="sm" className="hover:scale-105 rounded-full active:scale-95 transition-transform">
+                      <Button size="sm" className="hover:scale-105 rounded-full active:scale-95 transition-transform bg-[#6C3CF0]">
                         Get Started
                       </Button>
                     </Link>
@@ -470,43 +470,34 @@ export function Header() {
                       transition={{ duration: 0.3 }}
                       className="flex items-center gap-3 px-3 py-3 border-b border-border/40 mb-2 bg-accent/10 rounded-xl"
                     >
-                      <div className="relative w-10 h-10 rounded-full overflow-hidden border border-border shadow-inner flex-shrink-0">
+                      
+                      <div
+                       className="relative w-10 h-10 rounded-full overflow-hidden border border-border shadow-inner flex-shrink-0">
                         {user.avatar ? (
+                          
                           <img
+                          
+                          
+                        onClick={() => navigate("/profile")}
+                            
                             src={user.avatar}
                             alt={user.name}
                             className="w-full h-full object-cover"
                           />
+                          
+                          
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-primary to-violet-600 flex items-center justify-center text-white text-sm font-semibold">
                             {user.name.charAt(0).toUpperCase()}
                           </div>
                         )}
                       </div>
-                      <div className="flex flex-col min-w-0">
+                      <div onClick={() => navigate("/profile")} className="flex flex-col min-w-0">
                         <span className="text-sm font-semibold text-foreground truncate">{user.name}</span>
                         <span className="text-xs text-muted-foreground truncate">{user.email}</span>
                       </div>
                     </motion.div>
-                    {/* Mobile Search */}
-                    <motion.form
-                      initial={{ scale: 0.9, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      transition={{ duration: 0.2 }}
-                      onSubmit={handleSearch}
-                      className="py-2"
-                    >
-                      <div className="relative">
-                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                        <Input
-                          type="search"
-                          placeholder="Search..."
-                          className="pl-10 w-full bg-background/50"
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                        />
-                      </div>
-                    </motion.form>
+                        
 
                     <motion.div
                       initial={{ x: -20, opacity: 0 }}

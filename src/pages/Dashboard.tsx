@@ -400,7 +400,7 @@ export default function Dashboard() {
                   <p className="text-sm text-muted-foreground mb-3">No notes yet</p>
                   <Dialog open={isNoteDialogOpen} onOpenChange={setIsNoteDialogOpen}>
                     <DialogTrigger asChild>
-                      <Button size="sm">
+                      <Button className='cursor-pointer bg-[#6C3CF0]' size="sm">
                         <Plus className="w-4 h-4 mr-2" />
                         Create your first note
                       </Button>
