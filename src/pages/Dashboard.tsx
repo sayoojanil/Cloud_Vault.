@@ -234,7 +234,7 @@ export default function Dashboard() {
                 <p className="font-medium text-xs">All Documents</p>
                 
               </div>
-              <p className="text-xs text-muted-foreground">{activeDocumentCount} document{activeDocumentCount !== 1 ? 's' : ''}</p>
+              <p className="text-xs  text-green-500 font-bold">{activeDocumentCount} verified document{activeDocumentCount !== 1 ? 's' : ''}</p>
             </div>
           </div>
           
@@ -675,4 +675,4 @@ export default function Dashboard() {
       </main>
     </div>
   );
-}
+} 

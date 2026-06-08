@@ -57,6 +57,11 @@ export function Header() {
   };
 
   // Sync theme when it is updated elsewhere (like Settings page or system preference)
+  // Apply stored theme on initial load
+  useEffect(() => {
+    applyTheme(theme);
+  }, []);
+
   useEffect(() => {
     const handleThemeChange = () => {
       const currentTheme = (localStorage.getItem('theme') as Theme) || 'system';
