@@ -552,7 +552,7 @@ export default function Profile() {
               </div>
 
               <Button
-                className='bg-green-600 hover:bg-green-600 text-white hover:text-white'
+                className='bg-green-500 hover:bg-green-600 text-white hover:text-white'
                 variant={isEditing ? 'default' : 'outline'}
                 onClick={() => isEditing ? handleSave() : setIsEditing(true)}
                 disabled={isSaving}

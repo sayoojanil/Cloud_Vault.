@@ -837,7 +837,7 @@ const handleDelete = async () => {
               {filteredDocuments.length} document{filteredDocuments.length !== 1 ? 's' : ''}
             </p>
           </div>
-          <Button className="gap-2 rounded-full" onClick={() => setShowUploadDialog(true)}>
+          <Button className="gap-2 rounded-full bg-green-500 text-white" onClick={() => setShowUploadDialog(true)}>
             <Upload className="w-4 h-4" />
             Upload Documents
           </Button>
@@ -1372,10 +1372,10 @@ const handleDelete = async () => {
                   />
                 </div>
                 <div className="flex gap-4 pt-4">
-                  <Button variant="outline" className="flex-1" onClick={() => setPendingUploadFile(null)}>
+                  <Button  variant="outline" className="flex-1 bg-red-500 text-white" onClick={() => setPendingUploadFile(null)}>
                     Discard
                   </Button>
-                  <Button className="flex-1 bg-black text-white hover:bg-gray-600" onClick={confirmUpload}>
+                  <Button className="flex-1 bg-green-500 text-white" onClick={confirmUpload}>
                     Upload Photo
                   </Button>
                 </div>
