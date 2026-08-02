@@ -45,6 +45,13 @@ export default function Profile() {
   const [dob, setDob] = useState(user?.dob ? user.dob.substring(0,10) : ''); // yyyy-mm-dd
   const [isUploading, setIsUploading] = useState(false);
   const [isDeletingAvatar, setIsDeletingAvatar] = useState(false);
+  // Token state to ensure Aadhaar image reloads after login/logout
+  const [authToken, setAuthToken] = useState<string | null>(localStorage.getItem('vault_token'));
+
+  // Update token when user changes (e.g., after login/logout)
+  useEffect(() => {
+    setAuthToken(localStorage.getItem('vault_token'));
+  }, [user]);
   // Cropping states
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
   const [imageSrc, setImageSrc] = useState('');
@@ -198,7 +205,7 @@ export default function Profile() {
   const handleCropSave = async () => {
     if (!fileToUpload || !croppedAreaPixels) return;
     setIsUploading(true);
-    const toastId = toast.loading('Uploading profile picture...');
+    const toastId = true;
     try {
       const croppedBlob = await getCroppedImg(imageSrc, croppedAreaPixels);
       const croppedFile = new File([croppedBlob], fileToUpload.name, { type: fileToUpload.type });
@@ -427,12 +434,23 @@ export default function Profile() {
                         />
                       </div>
                       <div className="flex justify-between mt-4">
-                        <Button className='bg-green-500' variant="outline" onClick={() => setCropDialogOpen(false)}>
+                        <Button className='bg-red-500' variant="outline" onClick={() => setCropDialogOpen(false)}>
                           Cancel
                         </Button>
-                        <Button onClick={handleCropSave}>
-                          Save
-                        </Button>
+                       <Button
+  className="bg-green-500 text-white"
+  onClick={handleCropSave}
+  disabled={isUploading}
+>
+  {isUploading ? (
+    <>
+      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+      Updating...
+    </>
+  ) : (
+    "Update"
+  )}
+</Button>
                       </div>
                     </DialogContent>
                   </Dialog>
@@ -448,7 +466,8 @@ export default function Profile() {
                       <div className="p-4 flex items-center justify-center bg-muted/5 select-none">
                         {user?.adharImage && (
                           <img
-                            src={user.adharImage}
+                            key={authToken}
+                            src={user?.adharImage ? `${user.adharImage}?token=${authToken}` : ''}
                             alt="Aadhaar Card Full View"
                             className="max-h-[60vh] w-auto object-contain rounded border shadow-md"
                           />
@@ -695,7 +714,8 @@ export default function Profile() {
                           <img
                           
                            onClick={() => setAdharDialogOpen(true)}
-                            src={user.adharImage}
+                           key={authToken}
+                            src={user?.adharImage ? `${user.adharImage}?token=${authToken}` : ''}
                             alt="Aadhaar Card"
                             className="w-full h-full object-cover cursor-pointer"
                           />

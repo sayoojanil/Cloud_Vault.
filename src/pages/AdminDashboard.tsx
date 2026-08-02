@@ -150,7 +150,6 @@ export default function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 pb-16 selection:bg-rose-500/30 selection:text-rose-200">
-      <Header />
       
       <div className="container-wide pt-24 px-4 sm:px-6">
         

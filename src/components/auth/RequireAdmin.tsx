@@ -1,6 +1,8 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton-custom';
+import { error } from 'console';
+import { toast } from 'sonner';
 
 interface RequireAdminProps {
   children: React.ReactNode;
@@ -26,9 +28,11 @@ export function RequireAdmin({ children }: RequireAdminProps) {
   }
 
   if (!user.isAdmin) {
-    // If not admin, redirect to dashboard
+      
+    toast.error("You can't access to admin panel")
     return <Navigate to="/dashboard" replace />;
+    
   }
 
-  return <>{children}</>;
+  return <>{children}</>; 
 }

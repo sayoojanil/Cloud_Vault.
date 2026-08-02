@@ -1,10 +1,11 @@
-import { useState,useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSearchParams } from 'react-router-dom';
 import {
   Search,
   Filter,
   Grid,
+  Loader2,
   List,
   Upload,
   X,
@@ -84,6 +85,7 @@ import {
 } from '@/components/ui/slider';
 import { CreateCategoryDialog } from '@/components/CreateCategoryDialog';
 import { VerifyBadge } from '@/components/ui/verify-badge';
+
 const fileTypeIcons = {
   pdf: FileText,
   jpg: ImageIcon,
@@ -118,6 +120,13 @@ export default function Documents() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [zoomImageSrc, setZoomImageSrc] = useState<string>('');
   const [zoomImageName, setZoomImageName] = useState<string>('');
+  
+  // Upload states
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   const uploadBellRef = useRef<HTMLAudioElement | null>(null);
 
   // Camera states
@@ -140,8 +149,8 @@ export default function Documents() {
   });
 
   useEffect(() => {
-  uploadBellRef.current = new Audio('/bell.wav');
-}, []);
+    uploadBellRef.current = new Audio('/bell.wav');
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (cameraStream) {
@@ -245,8 +254,16 @@ export default function Documents() {
 
   const confirmUpload = async () => {
     if (!pendingUploadFile) return;
-    const toastId = toast.loading('Uploading document...');
+    
+    setIsUploading(true);
+    setUploadProgress(0);
+    
     try {
+      // Simulate progress for better UX
+      const progressInterval = setInterval(() => {
+        setUploadProgress(prev => Math.min(prev + 10, 90));
+      }, 200);
+
       await addDocument(pendingUploadFile, {
         name: uploadFormData.name || pendingUploadFile.name,
         category: uploadFormData.category,
@@ -258,16 +275,29 @@ export default function Documents() {
         },
         folder: uploadFormData.folder,
       });
+
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
       uploadBellRef.current?.play().catch(() => {});
-      toast.success('Document uploaded successfully', { id: toastId });
-      setShowUploadDialog(false);
-      setPendingUploadFile(null);
+      toast.success('Document uploaded successfully');
+      
+      // Close dialog after a brief delay to show completion
+      setTimeout(() => {
+        setShowUploadDialog(false);
+        setPendingUploadFile(null);
+        setIsUploading(false);
+        setUploadProgress(0);
+      }, 500);
+      
     } catch (error: any) {
-      toast.error('Upload failed: ' + (error.message || 'Unknown error'), { id: toastId });
+      setIsUploading(false);
+      setUploadProgress(0);
+      toast.error('Upload failed: ' + (error.message || 'Unknown error'));
     }
   };
 
-  document.title="Documents";
+  document.title = "Documents";
 
   const handleToggleFavorite = (docId: string, isFavorite: boolean) => {
     toggleFavorite(docId);
@@ -275,7 +305,7 @@ export default function Documents() {
     const document = documents.find(doc => doc.id === docId);
     const docName = document ? document.name : 'Document';
 
-    toast.success( 
+    toast.success(
       isFavorite ? `${docName} removed from favorites` : `${docName} added to favorites`,
       {
         description: isFavorite
@@ -284,8 +314,6 @@ export default function Documents() {
       }
     );
   };
-
-  
 
   const handleImageZoom = (imageSrc: string, imageName: string) => {
     setZoomImageSrc(imageSrc);
@@ -370,7 +398,7 @@ export default function Documents() {
     );
   }, [documents, selectedCategory, searchQuery, searchParams]);
 
-  // 🔹 Virtual Folder traversal and helpers
+  // Folder traversal and helpers
   const currentFolderDocs = useMemo(() => {
     if (searchQuery || searchParams.get('filter') === 'favorites' || selectedCategory) {
       return filteredDocuments;
@@ -572,14 +600,21 @@ export default function Documents() {
       return;
     }
 
-    // Show loading toast
-    const toastId = toast.loading(`Uploading ${files.length} files...`);
+    // Multiple files upload with spinner
+    setIsUploading(true);
+    setUploadProgress(0);
     
     let successfulUploads = 0;
     let failedUploads = 0;
+    const totalFiles = files.length;
 
     try {
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Update progress
+        setUploadProgress(Math.round((i / totalFiles) * 100));
+        
         // Validate file type
         if (!validTypes.includes(file.type)) {
           failedUploads++;
@@ -624,19 +659,30 @@ export default function Documents() {
         }
       }
 
+      setUploadProgress(100);
+      
       // Update the loading toast with result
       if (successfulUploads > 0 && failedUploads === 0) {
         uploadBellRef.current?.play().catch(() => {});
-        toast.success(`Successfully uploaded ${successfulUploads} files`, { id: toastId });
+        toast.success(`Successfully uploaded ${successfulUploads} files`);
+        setTimeout(() => {
+          setShowUploadDialog(false);
+          setIsUploading(false);
+          setUploadProgress(0);
+        }, 500);
       } else if (successfulUploads > 0 && failedUploads > 0) {
-        toast.warning(`Uploaded ${successfulUploads} files, ${failedUploads} failed`, { id: toastId });
+        toast.warning(`Uploaded ${successfulUploads} files, ${failedUploads} failed`);
+        setIsUploading(false);
+        setUploadProgress(0);
       } else if (successfulUploads === 0) {
-        toast.error('No files were uploaded successfully', { id: toastId });
+        toast.error('No files were uploaded successfully');
+        setIsUploading(false);
+        setUploadProgress(0);
       }
     } catch (error: any) {
-      toast.error('Upload failed: ' + (error.message || 'Unknown error'), { id: toastId });
-    } finally {
-      setShowUploadDialog(false);
+      setIsUploading(false);
+      setUploadProgress(0);
+      toast.error('Upload failed: ' + (error.message || 'Unknown error'));
     }
   };
 
@@ -644,15 +690,21 @@ export default function Documents() {
     if (!fileList || fileList.length === 0) return;
     const files = Array.from(fileList);
     
-    // Show loading toast
-    const toastId = toast.loading(`Uploading folder with ${files.length} files...`);
+    setIsUploading(true);
+    setUploadProgress(0);
     
     let successfulUploads = 0;
     let failedUploads = 0;
+    const totalFiles = files.length;
     const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
 
     try {
-      for (const file of files) {
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        
+        // Update progress
+        setUploadProgress(Math.round((i / totalFiles) * 100));
+        
         // Validate file type (if it has type; sometimes directories or hidden system files have no type, skip them)
         if (file.type && !validTypes.includes(file.type)) {
           continue;
@@ -666,7 +718,6 @@ export default function Documents() {
         }
 
         // Extract virtual folder structure from webkitRelativePath
-        // e.g. "MyFolder/SubFolder/file.pdf"
         const relativePath = file.webkitRelativePath || '';
         const pathParts = relativePath.split('/');
         let baseFolder = currentFolder ? currentFolder.split('/').slice(1).join('/') : '';
@@ -697,46 +748,55 @@ export default function Documents() {
         }
       }
 
+      setUploadProgress(100);
+      
       // Update the loading toast with result
       if (successfulUploads > 0 && failedUploads === 0) {
         uploadBellRef.current?.play().catch(() => {});
-        toast.success(`Successfully uploaded folder containing ${successfulUploads} files`, { id: toastId });
+        toast.success(`Successfully uploaded folder containing ${successfulUploads} files`);
+        setTimeout(() => {
+          setShowUploadDialog(false);
+          setIsUploading(false);
+          setUploadProgress(0);
+        }, 500);
       } else if (successfulUploads > 0 && failedUploads > 0) {
-        toast.warning(`Uploaded ${successfulUploads} files, ${failedUploads} failed`, { id: toastId });
+        toast.warning(`Uploaded ${successfulUploads} files, ${failedUploads} failed`);
+        setIsUploading(false);
+        setUploadProgress(0);
       } else if (successfulUploads === 0) {
-        toast.error('No files from the folder were uploaded successfully', { id: toastId });
+        toast.error('No files from the folder were uploaded successfully');
+        setIsUploading(false);
+        setUploadProgress(0);
       }
     } catch (error: any) {
-      toast.error('Folder upload failed: ' + (error.message || 'Unknown error'), { id: toastId });
-    } finally {
-      setShowUploadDialog(false);
+      setIsUploading(false);
+      setUploadProgress(0);
+      toast.error('Folder upload failed: ' + (error.message || 'Unknown error'));
     }
   };
+const handleDelete = async () => {
+  if (!selectedDocument) return;
 
-  const handleDelete = async () => {
-    if (!selectedDocument) return;
+  setIsDeleting(true);
 
-    try {
-      const toastId = toast.loading('Deleting document...', {
-        description: selectedDocument.name,
-      });
+  try {
+    await deleteDocument(selectedDocument.id);
 
-      await deleteDocument(selectedDocument.id);
+    toast.success("Document deleted successfully", {
+      description: `${selectedDocument.name} has been permanently deleted.`,
+    });
 
-      toast.success('Document deleted successfully', {
-        id: toastId,
-        description: `${selectedDocument.name} has been permanently deleted.`,
-      });
-
-      setShowDeleteDialog(false);
-      setSelectedDocument(null);
-    } catch (error) {
-      toast.error('Failed to delete document', {
-        description: selectedDocument?.name,
-      });
-      console.error('Delete error:', error);
-    }
-  };
+    setShowDeleteDialog(false);
+    setSelectedDocument(null);
+  } catch (error) {
+    toast.error("Failed to delete document", {
+      description: selectedDocument?.name,
+    });
+    console.error("Delete error:", error);
+  } finally {
+    setIsDeleting(false);
+  }
+};
 
   const handleArchive = async (doc: Document) => {
     try {
@@ -832,15 +892,13 @@ export default function Documents() {
                 className={`p-2 ${viewMode === 'list' ? 'bg-secondary' : ''}`}
               >
                 <List className="w-4 h-4" />
-                
               </button>
               
               <button
                 onClick={() => setViewMode('grid')}
                 className={`p-2 ${viewMode === 'grid' ? 'bg-secondary' : ''}`}
               >
-                 <Grid className="w-4 h-4" />
-               
+                <Grid className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -1102,9 +1160,6 @@ export default function Documents() {
                   className="flex items-center gap-4 p-4 hover:bg-vault-surface-hover transition-colors cursor-pointer"
                   onClick={() => openPdfInSameTab(doc.id)}
                 >
-                  {/* <div className="w-10 h-10 rounded bg-secondary flex items-center justify-center flex-shrink-0">
-                    <FileIcon className="w-5 h-5 text-muted-foreground" />
-                  </div> */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
                       <p className="font-medium text-xs truncate">{doc.name}</p>
@@ -1127,7 +1182,7 @@ export default function Documents() {
                     ))}
                     <button
                       onClick={(e) => {
-                        e.stopPropagation(); // Prevent triggering the row click
+                        e.stopPropagation();
                         toggleFavorite(doc.id);
                         handleToggleFavorite(doc.id, doc.isFavorite);
                       }}
@@ -1139,7 +1194,7 @@ export default function Documents() {
                       <DropdownMenuTrigger asChild>
                         <button 
                           className="p-2 rounded hover:bg-secondary text-muted-foreground"
-                          onClick={(e) => e.stopPropagation()} // Prevent triggering the row click
+                          onClick={(e) => e.stopPropagation()}
                         >
                           <MoreVertical className="w-4 h-4" />
                         </button>
@@ -1202,7 +1257,7 @@ export default function Documents() {
         )}
       </main>
 
-      {/* Upload Dialog */}
+      {/* Upload Dialog with Loading Spinner */}
       <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
@@ -1212,7 +1267,46 @@ export default function Documents() {
             </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col items-center w-full">
-            {pendingUploadFile ? (
+            {isUploading ? (
+              // Loading Spinner UI
+              <div className="w-full py-12 flex flex-col items-center justify-center">
+                <div className="relative w-24 h-24">
+                  {/* Outer ring */}
+                  <div className="absolute inset-0 border-4 border-primary/20 rounded-full"></div>
+                  {/* Animated spinner */}
+                  <div className="absolute inset-0 border-4 border-t-primary border-r-primary/30 border-b-primary/10 border-l-primary/50 rounded-full animate-spin"></div>
+                  {/* Center percentage */}
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="text-2xl font-bold text-primary">{uploadProgress}%</span>
+                  </div>
+                </div>
+                <p className="mt-6 font-medium text-foreground">Uploading document...</p>
+                <p className="mt-1 text-sm text-muted-foreground">Please wait while your file is being uploaded</p>
+                
+                {/* Progress bar */}
+                <div className="w-full max-w-xs mt-4 h-1.5 bg-secondary rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-primary transition-all duration-300 ease-out rounded-full"
+                    style={{ width: `${uploadProgress}%` }}
+                  />
+                </div>
+                
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="mt-6 text-muted-foreground hover:text-destructive"
+                  onClick={() => {
+                    setIsUploading(false);
+                    setUploadProgress(0);
+                    setPendingUploadFile(null);
+                    toast.warning('Upload cancelled');
+                  }}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Cancel Upload
+                </Button>
+              </div>
+            ) : pendingUploadFile ? (
               <div className="w-full space-y-4 text-left">
                 <div className="space-y-2">
                   <Label>Document Name</Label>
@@ -1288,8 +1382,9 @@ export default function Documents() {
               </div>
             ) : !isCameraOpen ? (
               <div
-                className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors w-full ${dragActive ? 'border-primary bg-primary/5' : 'border-border'
-                  }`}
+                className={`border-2 border-dashed rounded-lg p-12 text-center transition-colors w-full ${
+                  dragActive ? 'border-primary bg-primary/5' : 'border-border'
+                }`}
                 onDragEnter={handleDrag}
                 onDragLeave={handleDrag}
                 onDragOver={handleDrag}
@@ -1307,7 +1402,11 @@ export default function Documents() {
                   onChange={(e) => handleFiles(Array.from(e.target.files || []))}
                 />
                 <div className="flex justify-center gap-4">
-                  <Button className='rounded-full bg-black text-white hover:bg-gray-600 hover:text-white' variant="outline" onClick={() => document.getElementById('file-upload')?.click()}>
+                  <Button 
+                    className='rounded-full bg-black text-white hover:bg-gray-600 hover:text-white' 
+                    variant="outline" 
+                    onClick={() => document.getElementById('file-upload')?.click()}
+                  >
                     Select Files
                   </Button>
                   <Button 
@@ -1372,7 +1471,7 @@ export default function Documents() {
               <div className="aspect-[4/3] bg-vault-surface rounded-none flex items-center justify-center overflow-hidden">
                 {selectedDocument.fileType === 'pdf' ? (
                   <iframe
-                    src={`${import.meta.env.VITE_API_URL }/api/documents/${selectedDocument.id}/view?token=${localStorage.getItem('vault_token')}`}
+                    src={`${import.meta.env.VITE_API_URL}/api/documents/${selectedDocument.id}/view?token=${localStorage.getItem('vault_token')}`}
                     className="w-1/4 h-1/4 border-0"
                     title={selectedDocument.name}
                   />
@@ -1492,6 +1591,7 @@ export default function Documents() {
                       notes: formData.get('notes') as string,
                     },
                   });
+                  toast.success('Document updated successfully', { id: toastId });
                   setShowEditDialog(false);
                 } catch (error) {
                   toast.error('Failed to update document', { id: toastId });
@@ -1525,7 +1625,7 @@ export default function Documents() {
                   onClick={() => setShowCreateCategoryDialog(true)}
                   title="Create custom category"
                 >
-                  <Icons.Plus  className="w-4 h-4" />
+                  <Icons.Plus className="w-4 h-4" />
                 </Button>
               </div>
               <div>
@@ -1544,7 +1644,6 @@ export default function Documents() {
                 <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
                   Cancel
                 </Button>
-                <br/>
                 <Button type="submit">Update document</Button>
               </DialogFooter>
             </form>
@@ -1565,9 +1664,22 @@ export default function Documents() {
             <Button variant="outline" onClick={() => setShowDeleteDialog(false)}>
               Cancel
             </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Delete
-            </Button>
+            <Button
+  variant="destructive"
+  onClick={handleDelete}
+  disabled={isDeleting}
+>
+  {isDeleting ? (
+    <>
+      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+      Deleting...
+    </>
+  ) : (
+    "Delete"
+  )}
+</Button>
+
+            
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -1589,7 +1701,6 @@ export default function Documents() {
                 initial={{ opacity: 0, scale: 0.95 }}
                 animate={{ opacity: 1, scale: zoomLevel / 100 }}
                 transition={{ duration: 0.2 }}
-                // Pinch to zoom gesture support
                 onTouchStart={(e) => {
                   if (e.touches.length === 2) {
                     e.preventDefault();
@@ -1605,19 +1716,16 @@ export default function Documents() {
                       touch2.clientY - touch1.clientY
                     );
                     
-                    // Calculate zoom level based on pinch distance
-                    const baseDistance = 100; // arbitrary base distance
+                    const baseDistance = 100;
                     const newZoom = Math.min(300, Math.max(50, (distance / baseDistance) * 100));
-                    setZoomLevel(Math.round(newZoom / 5) * 5); // Round to nearest 5%
+                    setZoomLevel(Math.round(newZoom / 5) * 5);
                   }
                 }}
-                // Double tap to zoom
                 onTouchEnd={(e) => {
                   if (e.touches.length === 0 && e.changedTouches.length === 1) {
                     const touch = e.changedTouches[0];
                     const now = Date.now();
                     if (now - lastTapTime < 300) {
-                      // Double tap detected
                       if (zoomLevel === 100) {
                         setZoomLevel(200);
                       } else {
@@ -1633,18 +1741,14 @@ export default function Documents() {
 
             {/* Compact Mobile Controls */}
             <div className="flex flex-col gap-2 p-3 bg-black/90 backdrop-blur-sm">
-              {/* File Name - Compact */}
               <div className="flex items-center justify-center mb-1">
                 <p className="text-white text-sm font-medium truncate max-w-[80vw] text-center">
                   {zoomImageName}
                 </p>
               </div>
 
-              {/* Zoom Controls Row */}
               <div className="flex items-center justify-between">
-                {/* Left Controls */}
                 <div className="flex items-center gap-2">
-                  {/* Reset Button */}
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1666,7 +1770,6 @@ export default function Documents() {
                     </Tooltip>
                   </TooltipProvider>
 
-                  {/* Rotation */}
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1686,9 +1789,7 @@ export default function Documents() {
                   </TooltipProvider>
                 </div>
 
-                {/* Zoom Percentage Display */}
                 <div className="flex items-center gap-2">
-                  {/* Zoom Out */}
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1708,12 +1809,10 @@ export default function Documents() {
                     </Tooltip>
                   </TooltipProvider>
 
-                  {/* Zoom Level */}
                   <div className="min-w-[60px] text-center">
                     <span className="text-white text-sm font-medium">{zoomLevel}%</span>
                   </div>
 
-                  {/* Zoom In */}
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1734,9 +1833,7 @@ export default function Documents() {
                   </TooltipProvider>
                 </div>
 
-                {/* Right Controls */}
                 <div className="flex items-center gap-2">
-                  {/* Fullscreen */}
                   <TooltipProvider>
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -1759,7 +1856,6 @@ export default function Documents() {
                     </Tooltip>
                   </TooltipProvider>
 
-                  {/* Close Button */}
                   <DialogClose asChild>
                     <Button
                       variant="ghost"
@@ -1772,7 +1868,6 @@ export default function Documents() {
                 </div>
               </div>
 
-              {/* Zoom Slider - Mobile Friendly */}
               <div className="px-1 mt-1">
                 <Slider
                   value={[zoomLevel]}
@@ -1789,7 +1884,6 @@ export default function Documents() {
                 </div>
               </div>
 
-              {/* Quick Zoom Presets */}
               <div className="flex justify-center gap-2 mt-2">
                 {[100, 150, 200].map((preset) => (
                   <Button
