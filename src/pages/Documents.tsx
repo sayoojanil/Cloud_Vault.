@@ -148,8 +148,10 @@ export default function Documents() {
     folder: ''
   });
 
+  const [isOpeningDocument, setIsOpeningDocument] = useState(false);
+
   useEffect(() => {
-    uploadBellRef.current = new Audio('/bell.wav');
+    uploadBellRef.current = new Audio('/Doc.wav');
   }, []);
 
   const stopCamera = useCallback(() => {
@@ -280,7 +282,7 @@ export default function Documents() {
       setUploadProgress(100);
       
       uploadBellRef.current?.play().catch(() => {});
-      toast.success('Document uploaded successfully');
+      // toast.success('Document uploaded successfully');
       
       // Close dialog after a brief delay to show completion
       setTimeout(() => {
@@ -324,29 +326,35 @@ export default function Documents() {
   };
 
   // Open PDF in same tab
-  const openPdfInSameTab = (documentId: string) => {
-    try {
-      const token = localStorage.getItem('vault_token');
-      if (!token) {
-        toast.error('Authentication required. Please log in again.');
-        return;
-      }
-      
-      const apiUrl = import.meta.env.VITE_API_URL;
-      if (!apiUrl) {
-        toast.error('Configuration error. Please try again.');
-        return;
-      }
-      
-      const viewUrl = `${apiUrl}/api/documents/${documentId}/view?token=${token}`;
-      
-      // Navigate in the same tab
-      window.location.href = viewUrl;
-    } catch (error) {
-      console.error('Error opening PDF:', error);
-      toast.error('Failed to open document. Please try again.');
+ const openPdfInSameTab = (documentId: string) => {
+  try {
+    setIsOpeningDocument(true);
+
+    const token = localStorage.getItem("vault_token");
+    if (!token) {
+      setIsOpeningDocument(false);
+      toast.error("Authentication required. Please log in again.");
+      return;
     }
-  };
+
+    const apiUrl = import.meta.env.VITE_API_URL;
+    if (!apiUrl) {
+      setIsOpeningDocument(false);
+      toast.error("Configuration error. Please try again.");
+      return;
+    }
+
+    const viewUrl = `${apiUrl}/api/documents/${documentId}/view?token=${token}`;
+
+    // Small delay so spinner becomes visible
+    setTimeout(() => {
+      window.location.href = viewUrl;
+    }, 300);
+  } catch (error) {
+    setIsOpeningDocument(false);
+    toast.error("Failed to open document.");
+  }
+};
 
   // Share document
   const handleShare = async (doc: Document) => {
@@ -827,6 +835,42 @@ const handleDelete = async () => {
   return (
     <div className="min-h-screen bg-vault-surface">
       <Header />
+
+      <AnimatePresence>
+  {isOpeningDocument && (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-[9999] bg-background/80 backdrop-blur-sm flex items-center justify-center"
+    >
+      {/* <motion.div
+        initial={{ scale: 0.8 }}
+        animate={{ scale: 1 }}
+        transition={{
+          duration: 0.4,
+          repeat: Infinity,
+          repeatType: "reverse",
+        }}
+        className="flex flex-col items-center gap-4"
+      > */}
+       <div className="relative h-20 w-20">
+  <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
+  <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin"></div>
+
+  <FileText className="absolute inset-0 m-auto h-8 w-8 text-primary" />
+
+      
+</div>
+  <p className="text-sm font-medium ">
+  Loading document...
+</p>
+
+   
+
+      </motion.div>
+  )}
+</AnimatePresence>
 
       <main className="pt-24 pb-12 container-wide">
         {/* Header */}

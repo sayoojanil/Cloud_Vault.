@@ -153,6 +153,44 @@ export function Header() {
 
             {/* Desktop Navigation */}
             <nav className="hidden md:flex items-center gap-6">
+                <div className="flex items-center justify-between">
+                          
+                            <div className="flex items-center gap-0.5 bg-accent/40 rounded-full p-0.5 border border-border/30">
+                              <button
+                                type="button"
+                                onClick={() => handleThemeToggle('light')}
+                                className={cn(
+                                  "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                                  theme === 'light' && "bg-background text-primary shadow-sm "
+                                )}
+                                title="Light Mode"
+                              >
+                                <Sun className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleThemeToggle('dark')}
+                                className={cn(
+                                  "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                                  theme === 'dark' && "bg-background text-primary shadow-sm"
+                                )}
+                                title="Dark Mode"
+                              >
+                                <Moon className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleThemeToggle('system')}
+                                className={cn(
+                                  "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                                  theme === 'system' && "bg-background text-primary shadow-sm"
+                                )}
+                                title="System Preference"
+                              >
+                                <Laptop className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
               {!user ? (
                 <>
                   
@@ -359,7 +397,7 @@ export function Header() {
                         <DropdownMenuSeparator />
                         <DropdownMenuItem 
                           onClick={confirmLogout} 
-                          className="text-destructive hover:scale-105 active:scale-95 transition-transform"
+                          className="text-destructive hover:scale-105 active:scale-95 transition-transform cursor-pointer"
                         >
                           <LogOut className="w-4 h-4 mr-2" />
                           Logout
@@ -417,6 +455,47 @@ export function Header() {
               className="md:hidden border-t border-border bg-background/95 backdrop-blur-lg"
             >
               <nav className="container-wide py-4 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 font-medium">
+                              {theme === 'dark' ? <Moon className="w-3.5 h-3.5 text-primary" /> : theme === 'light' ? <Sun className="w-3.5 h-3.5 text-primary" /> : <Laptop className="w-3.5 h-3.5 text-primary" />}
+                              Theme
+                            </span>
+                            <div className="flex items-center gap-0.5 bg-accent/40 rounded-full p-0.5 border border-border/30">
+                              <button
+                                type="button"
+                                onClick={() => handleThemeToggle('light')}
+                                className={cn(
+                                  "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                                  theme === 'light' && "bg-background text-primary shadow-sm"
+                                )}
+                                title="Light Mode"
+                              >
+                                <Sun className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleThemeToggle('dark')}
+                                className={cn(
+                                  "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                                  theme === 'dark' && "bg-background text-primary shadow-sm"
+                                )}
+                                title="Dark Mode"
+                              >
+                                <Moon className="w-3 h-3" />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleThemeToggle('system')}
+                                className={cn(
+                                  "p-1 rounded-full hover:bg-background/80 hover:text-foreground transition-all duration-200",
+                                  theme === 'system' && "bg-background text-primary shadow-sm"
+                                )}
+                                title="System Preference"
+                              >
+                                <Laptop className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
                 {!user ? (
                   <>
                     <motion.div

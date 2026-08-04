@@ -147,7 +147,7 @@ export default function Login() {
         
         clearInterval(messageInterval);
         setLoginPhase('success');
-        setSignInText('Access Granted');
+        setSignInText('Login Successfull');
         
         // Add a small delay for the success animation to complete
         setTimeout(() => {
@@ -287,7 +287,7 @@ export default function Login() {
                           className="flex items-center gap-2"
                         >
                           <Lock className="w-4 h-4" />
-                          <span>Sign In</span>
+                          <span>Login</span>
                         </motion.div>
                       )}
                       

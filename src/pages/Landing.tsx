@@ -334,7 +334,7 @@
                       y: -8,
                       transition: { duration: 0.3 }
                     }}
-                    className="vault-card-hover p-6 cursor-pointer"
+                    className="vault-card-hover p-6 "
                   >
                     <motion.div
                       initial={{ scale: 0, rotate: -180 }}

@@ -133,11 +133,12 @@ export function Footer() {
             </div>
           </div>
           <div className="flex gap-3">
-            <a href="#" className="bg-gray-800 text-white text-xs px-4 py-2 rounded-lg flex items-center gap-1 shadow-sm hover:bg-gray-700 transition">
+             <a onClick={() => alert('Google play feature coming soon')}className="bg-gray-800 cursor-pointer text-white text-xs px-4 py-2 rounded-lg flex items-center gap-1 shadow-sm hover:bg-gray-700 transition">
               <Smartphone className="w-3.5 h-3.5" />
               Google Play
             </a>
-            <a href="#" className="bg-gray-800 text-white text-xs px-4 py-2 rounded-lg flex items-center gap-1 shadow-sm hover:bg-gray-700 transition">
+            <a onClick={() => alert('App Store feature coming soon')}
+            className="bg-gray-800 text-white text-xs px-4 py-2 cursor-pointer rounded-lg flex items-center gap-1 shadow-sm hover:bg-gray-700 transition">
               <Apple className="w-3.5 h-3.5" />
               App Store
             </a>
