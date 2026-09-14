@@ -85,14 +85,13 @@ import {
 } from '@/components/ui/slider';
 import { CreateCategoryDialog } from '@/components/CreateCategoryDialog';
 import { VerifyBadge } from '@/components/ui/verify-badge';
-
-const fileTypeIcons = {
-  pdf: FileText,
-  jpg: ImageIcon,
-  png: ImageIcon,
-  webp: ImageIcon,
-  gif: ImageIcon,
-};
+import {
+  DigiLockerFileIcon,
+  DigiLockerPdfIcon,
+  DigiLockerImageIcon,
+  DigiLockerFolderIcon,
+  DigiLockerDocumentPreview,
+} from '@/components/ui/digilocker-icons';
 
 // Track last tap time for double tap detection
 let lastTapTime = 0;
@@ -854,15 +853,13 @@ const handleDelete = async () => {
         }}
         className="flex flex-col items-center gap-4"
       > */}
-       <div className="relative h-20 w-20">
+       <div className="relative h-20 w-20 flex items-center justify-center">
   <div className="absolute inset-0 rounded-full border-4 border-primary/20"></div>
   <div className="absolute inset-0 rounded-full border-4 border-transparent border-t-primary animate-spin"></div>
 
-  <FileText className="absolute inset-0 m-auto h-8 w-8 text-primary" />
-
-      
+  <DigiLockerPdfIcon size="sm" className="relative z-10" />
 </div>
-  <p className="text-sm font-medium ">
+  <p className="text-sm font-medium mt-3">
   Loading document...
 </p>
 
@@ -978,9 +975,9 @@ const handleDelete = async () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="vault-card p-12 text-center"
+            className="vault-card p-12 text-center flex flex-col items-center justify-center"
           >
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <DigiLockerFolderIcon size="xl" color="amber" className="mx-auto mb-4" />
             <h3 className="font-semibold mb-2">No documents found</h3>
             <p className="text-muted-foreground text-sm mb-4">
               {searchQuery ? 'Try adjusting your search or filters' : 'Upload your first document to get started'}
@@ -1026,8 +1023,8 @@ const handleDelete = async () => {
                     className="vault-card-hover group cursor-pointer"
                     onClick={() => setCurrentFolder(folderPath)}
                   >
-                    <div className="p-6 flex flex-col items-center justify-center gap-3 aspect-[4/3] bg-vault-surface-hover/50">
-                      <FolderIcon className="w-16 h-16 text-blue-500 fill-blue-500/20" />
+                    <div className="p-6 flex flex-col items-center justify-center gap-3 aspect-[4/3] bg-vault-surface-hover/50 rounded-lg">
+                      <DigiLockerFolderIcon size="xl" color={folderPath === 'all_files' ? 'blue' : 'amber'} />
                       <div className="text-center">
                         <p className="font-semibold">{folderName}</p>
                         <p className="text-xs text-muted-foreground">{getFolderFileCount(folderPath)} items</p>
@@ -1039,7 +1036,6 @@ const handleDelete = async () => {
               {currentFolderDocs.map((doc) => {
                 const docCat = categories.find(c => c.key === doc.category) || categories.find(c => c.key === 'other');
                 const CategoryIcon = (Icons as any)[docCat?.icon || 'Folder'] || Icons.Folder;
-                const FileIcon = fileTypeIcons[doc.fileType];
                 const catLabel = docCat?.label || 'Other';
 
                 return (
@@ -1052,24 +1048,15 @@ const handleDelete = async () => {
                     className="vault-card-hover group"
                   >
                     <div
-                      className="aspect-[4/3] bg-vault-surface rounded-none flex items-center justify-center cursor-pointer overflow-hidden"
-                      onClick={() => openPdfInSameTab(doc.id)}
+                      className="aspect-[4/3] bg-vault-surface rounded-none overflow-hidden"
                     >
-                      {doc.fileType === 'pdf' ? (
-                        <FileIcon className="w-12 h-12 text-muted-foreground" />
-                      ) : (
-                        <img
-                          src={doc.thumbnailUrl || doc.fileUrl}
-                          alt={doc.name}
-                          className="w-full h-full object-cover cursor-pointer"
-                          onClick={() => openPdfInSameTab(doc.id)}
-                        />
-                      )}
+                      <DigiLockerDocumentPreview doc={doc} onClick={() => openPdfInSameTab(doc.id)} />
                     </div>
                     <div className="p-4">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
+                            <DigiLockerFileIcon fileType={doc.fileType} category={doc.category} name={doc.name} size="xs" />
                             <p className="font-medium text-sm truncate">{doc.name}</p>
                             <VerifyBadge verified={doc.isVerified ?? true} />
                           </div>
@@ -1182,8 +1169,8 @@ const handleDelete = async () => {
                   className="flex items-center gap-4 p-4 hover:bg-vault-surface-hover transition-colors cursor-pointer"
                   onClick={() => setCurrentFolder(folderPath)}
                 >
-                  <div className="w-10 h-10 rounded bg-blue-500/10 flex items-center justify-center flex-shrink-0">
-                    <FolderIcon className="w-5 h-5 text-blue-500 fill-blue-500/20" />
+                  <div className="w-10 h-10 flex items-center justify-center flex-shrink-0">
+                    <DigiLockerFolderIcon size="md" color={folderPath === 'all_files' ? 'blue' : 'amber'} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-sm truncate">{folderName}</p>
@@ -1195,7 +1182,6 @@ const handleDelete = async () => {
             {currentFolderDocs.map((doc) => {
               const docCat = categories.find(c => c.key === doc.category) || categories.find(c => c.key === 'other');
               const CategoryIcon = (Icons as any)[docCat?.icon || 'Folder'] || Icons.Folder;
-              const FileIcon = fileTypeIcons[doc.fileType];
               const catLabel = docCat?.label || 'Other';
 
               return (
@@ -1204,9 +1190,12 @@ const handleDelete = async () => {
                   className="flex items-center gap-4 p-4 hover:bg-vault-surface-hover transition-colors cursor-pointer"
                   onClick={() => openPdfInSameTab(doc.id)}
                 >
+                  <div className="flex-shrink-0">
+                    <DigiLockerFileIcon fileType={doc.fileType} category={doc.category} name={doc.name} size="md" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-xs truncate">{doc.name}</p>
+                      <p className="font-medium text-sm truncate">{doc.name}</p>
                       <VerifyBadge verified={doc.isVerified ?? true} />
                     </div>
                     <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
