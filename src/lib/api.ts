@@ -8,6 +8,14 @@ const getAuthHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {};
 };
 
+const toReminderISOString = (value: string | Date | null | undefined) => {
+  if (value == null || value === "") return value;
+  const date = value instanceof Date ? value : new Date(value);
+  return Number.isNaN(date.getTime()) ? value : date.toISOString();
+};
+
+const getReminderTimezone = () => Intl.DateTimeFormat().resolvedOptions().timeZone;
+
 // Generic fetch wrapper with error handling
 const fetchWrapper = async <T>(
   endpoint: string,
@@ -50,7 +58,7 @@ const fetchWrapper = async <T>(
   }
 
   const data = await response.json();
-  return data.data;
+  return (data.data !== undefined ? data.data : data) as T;
 };
 
 // Auth APIs
@@ -92,6 +100,19 @@ export const apiUploadDocument = (file: File, metadata: {
   folder?: string;
 }) => {
   const formData = new FormData();
+  const reminderDate = metadata.metadata?.reminderDate;
+  const serializedReminderDate = toReminderISOString(reminderDate);
+  const documentMetadata = metadata.metadata
+    ? {
+        ...metadata.metadata,
+        ...(reminderDate !== undefined
+          ? {
+              reminderDate: serializedReminderDate,
+              reminderTimezone: reminderDate ? getReminderTimezone() : null,
+            }
+          : {}),
+      }
+    : metadata.metadata;
   formData.append("file", file);
   formData.append("name", metadata.name || file.name || `Document-${Date.now()}`);
   formData.append("category", metadata.category || "other");
@@ -99,8 +120,11 @@ export const apiUploadDocument = (file: File, metadata: {
 
   if (metadata.folder) formData.append("folder", metadata.folder);
   if (metadata.tags?.length) formData.append("tags", JSON.stringify(metadata.tags));
-  if (metadata.metadata && Object.keys(metadata.metadata).length) {
-    formData.append("metadata", JSON.stringify(metadata.metadata));
+  if (documentMetadata && Object.keys(documentMetadata).length) {
+    formData.append("metadata", JSON.stringify(documentMetadata));
+    if (documentMetadata.reminderDate) {
+      formData.append("reminderDate", String(documentMetadata.reminderDate));
+    }
   }
 
   return fetchWrapper("/api/documents", {
@@ -114,13 +138,46 @@ export const apiUpdateDocument = (id: string, updates: {
   category?: string;
   tags?: string[];
   metadata?: any;
+  reminderDate?: string | Date | null;
   isFavorite?: boolean;
   isArchived?: boolean;
   folder?: string;
-}) =>
-  fetchWrapper(`/api/documents/${id}`, {
+}) => {
+  const normalizedUpdates = { ...updates };
+  const normalizedMetadata = updates.metadata ? { ...updates.metadata } : undefined;
+  const hasRootReminderDate = Object.prototype.hasOwnProperty.call(updates, "reminderDate");
+  const hasMetadataReminderDate = Boolean(
+    normalizedMetadata && Object.prototype.hasOwnProperty.call(normalizedMetadata, "reminderDate")
+  );
+
+  if (hasRootReminderDate || hasMetadataReminderDate) {
+    const reminderDate = hasRootReminderDate ? updates.reminderDate : normalizedMetadata?.reminderDate;
+    const serializedReminderDate = toReminderISOString(reminderDate);
+    if (hasRootReminderDate) normalizedUpdates.reminderDate = serializedReminderDate;
+    if (normalizedMetadata) {
+      normalizedMetadata.reminderDate = serializedReminderDate;
+      normalizedMetadata.reminderTimezone = reminderDate
+        ? getReminderTimezone()
+        : null;
+      normalizedUpdates.metadata = normalizedMetadata;
+    }
+  }
+
+  return fetchWrapper(`/api/documents/${id}`, {
     method: "PUT",
-    body: JSON.stringify(updates),
+    body: JSON.stringify(normalizedUpdates),
+  });
+};
+
+export const apiCheckReminders = () =>
+  fetchWrapper<{ success: boolean; message: string; data: any }>("/api/documents/check-reminders", {
+    method: "POST",
+  });
+
+export const apiTestReminderEmail = (data?: { documentName?: string; category?: string; reminderDate?: string }) =>
+  fetchWrapper<{ success: boolean; message: string }>("/api/documents/test-reminder-email", {
+    method: "POST",
+    body: JSON.stringify(data || {}),
   });
 
 export const apiDeleteDocument = (id: string) =>

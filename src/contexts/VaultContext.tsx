@@ -114,6 +114,8 @@
 
     // Transform backend document to frontend format
     const transformDocument = (doc: any): Document => {
+      const reminderDate = doc.reminderDate || doc.metadata?.reminderDate || null;
+      const reminderSent = doc.reminderSent ?? doc.metadata?.reminderSent ?? false;
       return {
         id: doc._id || doc.id,
         name: doc.name,
@@ -124,7 +126,14 @@
         uploadedAt: new Date(doc.createdAt || doc.uploadedAt),
         modifiedAt: new Date(doc.updatedAt || doc.modifiedAt),
         tags: doc.tags || [],
-        metadata: doc.metadata || {},
+        metadata: {
+          ...(doc.metadata || {}),
+          reminderDate,
+          reminderSent,
+          reminderSentAt: doc.metadata?.reminderSentAt || doc.reminderSentAt || null,
+        },
+        reminderDate,
+        reminderSent,
         thumbnailUrl: doc.thumbnailUrl,
         fileUrl: doc.fileUrl,
         isArchived: doc.isArchived || false,

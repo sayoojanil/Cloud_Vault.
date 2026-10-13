@@ -14,6 +14,9 @@ export interface Document {
   isArchived: boolean;
   isFavorite: boolean;
   folder?: string;
+  reminderDate?: Date | string | null;
+  reminderTimezone?: string | null;
+  reminderSent?: boolean;
 }
 
 export interface DocumentMetadata {
@@ -21,6 +24,10 @@ export interface DocumentMetadata {
   expiryDate?: Date;
   notes?: string;
   documentNumber?: string;
+  reminderDate?: Date | string | null;
+  reminderTimezone?: string | null;
+  reminderSent?: boolean;
+  reminderSentAt?: Date | string | null;
 }
 
 export type DocumentCategory = string;
@@ -59,7 +66,7 @@ export interface StorageStats {
 
 export interface ActivityLog {
   id: string;
-  action: 'upload' | 'view' | 'download' | 'delete' | 'rename' | 'archive';
+  action: 'upload' | 'view' | 'download' | 'delete' | 'rename' | 'archive' | 'reminder_sent';
   documentId: string;
   documentName: string;
   timestamp: Date;

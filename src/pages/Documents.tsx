@@ -37,7 +37,10 @@ import {
   ZoomOut,
   RotateCw,
   Camera,
-  Share2
+  Share2,
+  Bell,
+  AlertCircle,
+  CalendarClock
 } from 'lucide-react';
 import * as Icons from 'lucide-react';
 import { Header } from '@/components/layout/Header';
@@ -48,6 +51,7 @@ import { useVault } from '@/contexts/VaultContext';
 import { Document, DocumentCategory } from '@/types/vault';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
+import { apiTestReminderEmail } from '@/lib/api';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -95,6 +99,16 @@ import {
 
 // Track last tap time for double tap detection
 let lastTapTime = 0;
+
+const toLocalDateTimeInputValue = (value: Date | string | null | undefined) => {
+  if (!value) return '';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const pad = (part: number) => String(part).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const getLocalDateTimeInputMin = () => toLocalDateTimeInputValue(new Date());
 
 export default function Documents() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -144,8 +158,27 @@ export default function Documents() {
     notes: '',
     issuer: '',
     tags: '',
-    folder: ''
+    folder: '',
+    reminderDate: '',
   });
+  const [isSendingTestAlert, setIsSendingTestAlert] = useState(false);
+
+  const handleTestAlertEmail = async () => {
+    setIsSendingTestAlert(true);
+    const toastId = toast.loading('Sending test alert email...');
+    try {
+      const res: any = await apiTestReminderEmail({
+        documentName: uploadFormData.name || pendingUploadFile?.name || 'Passport / ID Card (Sample)',
+        category: uploadFormData.category || 'other',
+        reminderDate: uploadFormData.reminderDate || new Date().toISOString(),
+      });
+      toast.success(res?.message || 'Alert email sent successfully!', { id: toastId });
+    } catch (err: any) {
+      toast.error('Failed to send email: ' + (err.message || 'Unknown error'), { id: toastId });
+    } finally {
+      setIsSendingTestAlert(false);
+    }
+  };
 
   const [isOpeningDocument, setIsOpeningDocument] = useState(false);
 
@@ -243,7 +276,8 @@ export default function Documents() {
         notes: '',
         issuer: '',
         tags: '',
-        folder: currentFolder ? currentFolder.split('/').slice(1).join('/') : ''
+        folder: currentFolder ? currentFolder.split('/').slice(1).join('/') : '',
+        reminderDate: '',
       });
       stopCamera();
       setIsCameraOpen(false);
@@ -273,6 +307,7 @@ export default function Documents() {
         metadata: {
           notes: uploadFormData.notes,
           issuer: uploadFormData.issuer,
+          reminderDate: uploadFormData.reminderDate || null,
         },
         folder: uploadFormData.folder,
       });
@@ -287,6 +322,15 @@ export default function Documents() {
       setTimeout(() => {
         setShowUploadDialog(false);
         setPendingUploadFile(null);
+        setUploadFormData({
+          name: '',
+          category: 'other' as DocumentCategory,
+          notes: '',
+          issuer: '',
+          tags: '',
+          folder: '',
+          reminderDate: '',
+        });
         setIsUploading(false);
         setUploadProgress(0);
       }, 500);
@@ -602,7 +646,8 @@ export default function Documents() {
         notes: '',
         issuer: '',
         tags: '',
-        folder: currentFolder ? currentFolder.split('/').slice(1).join('/') : ''
+        folder: currentFolder ? currentFolder.split('/').slice(1).join('/') : '',
+        reminderDate: '',
       });
       return;
     }
@@ -1064,6 +1109,15 @@ const handleDelete = async () => {
                             <CategoryIcon className="w-3 h-3" />
                             <span>{catLabel}</span>
                           </div>
+                          {doc.metadata?.reminderDate && (
+                            <div className="flex items-center gap-1.5 mt-2 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full w-fit">
+                              <Bell className="w-3 h-3 animate-pulse flex-shrink-0" />
+                              <span>Reminder: {format(new Date(doc.metadata.reminderDate), 'MMM d, yyyy p')}</span>
+                              {doc.metadata?.reminderSent && (
+                                <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">• Alerted</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                         <div className="flex items-center gap-1">
                           <button
@@ -1205,6 +1259,15 @@ const handleDelete = async () => {
                       </span>
                       <span>{formatBytes(doc.size)}</span>
                       <span>{format(new Date(doc.uploadedAt), 'MMM d, yyyy')}</span>
+                      {doc.metadata?.reminderDate && (
+                        <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400 font-medium bg-amber-500/10 px-1.5 py-0.5 rounded">
+                          <Bell className="w-3 h-3" />
+                          Reminder: {format(new Date(doc.metadata.reminderDate), 'MMM d, yyyy p')}
+                          {doc.metadata?.reminderSent && (
+                            <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">• Alerted</span>
+                          )}
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1404,12 +1467,127 @@ const handleDelete = async () => {
                     onChange={e => setUploadFormData({...uploadFormData, notes: e.target.value})} 
                   />
                 </div>
+
+                {/* Expiration Alert & Reminder Date Section */}
+                <div className="p-4 rounded-xl border border-amber-500/30 bg-amber-500/5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-lg bg-amber-500/20 text-amber-500 flex items-center justify-center">
+                        <Bell className="w-4 h-4 animate-bounce" />
+                      </div>
+                      <div>
+                        <Label className="text-sm font-semibold flex items-center gap-1.5 text-foreground cursor-pointer" htmlFor="upload-reminder-date">
+                          Expiry Reminder Date
+                        </Label>
+                        <p className="text-xs text-muted-foreground">
+                          Email reminder at your selected date and time
+                        </p>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className="text-[11px] font-bold border-amber-500/40 text-amber-600 dark:text-amber-400 bg-amber-500/10">
+                      BE ALERT ⚠️
+                    </Badge>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Input
+                      id="upload-reminder-date"
+                      type="datetime-local"
+                      min={getLocalDateTimeInputMin()}
+                      step={60}
+                      value={uploadFormData.reminderDate}
+                      onChange={(e) => setUploadFormData({ ...uploadFormData, reminderDate: e.target.value })}
+                      className="bg-background/80"
+                    />
+                  </div>
+
+                  {/* Quick helper date presets */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                    <span className="text-[11px] text-muted-foreground mr-1">Quick Presets:</span>
+                    {[
+                      { label: '+30 Days', days: 30 },
+                      { label: '+90 Days', days: 90 },
+                      { label: '+6 Months', days: 180 },
+                      { label: '+1 Year', days: 365 },
+                    ].map((preset) => (
+                      <Button
+                        key={preset.label}
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-6 px-2 text-[11px] rounded-full hover:bg-amber-500/15 hover:border-amber-500/50"
+                        onClick={() => {
+                          const d = new Date();
+                          d.setDate(d.getDate() + preset.days);
+                          // Format as YYYY-MM-DDTHH:MM for datetime-local input
+                          const pad = (n: number) => String(n).padStart(2, '0');
+                          const local = `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+                          setUploadFormData({
+                            ...uploadFormData,
+                            reminderDate: local,
+                          });
+                        }}
+                      >
+                        {preset.label}
+                      </Button>
+                    ))}
+                    {uploadFormData.reminderDate && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-[11px] text-muted-foreground hover:text-destructive"
+                        onClick={() => setUploadFormData({ ...uploadFormData, reminderDate: '' })}
+                      >
+                        Clear
+                      </Button>
+                    )}
+                  </div>
+
+                  {uploadFormData.reminderDate ? (
+                    <div className="text-xs text-amber-700 dark:text-amber-300 bg-amber-500/15 border border-amber-500/30 p-2.5 rounded-lg flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="w-4 h-4 flex-shrink-0 mt-0.5 text-amber-500" />
+                        <span>
+                          <strong>BE ALERT:</strong> An email will be sent on <strong>{format(new Date(uploadFormData.reminderDate), 'PPP p')}</strong> (your local time) to remind you about this document.
+                        </span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={isSendingTestAlert}
+                        onClick={handleTestAlertEmail}
+                        className="h-7 text-[11px] whitespace-nowrap bg-background flex-shrink-0"
+                      >
+                        {isSendingTestAlert ? 'Sending...' : 'Test Email'}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between pt-1">
+                      <p className="text-[11px] text-muted-foreground">
+                        Optional: Leave empty if no expiration reminder is required.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        disabled={isSendingTestAlert}
+                        onClick={handleTestAlertEmail}
+                        className="h-6 text-[11px] text-muted-foreground hover:text-foreground"
+                      >
+                        Test Alert Email
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex gap-4 pt-4">
-                  <Button  variant="outline" className="flex-1 bg-red-500 text-white" onClick={() => setPendingUploadFile(null)}>
+                  <Button variant="outline" className="flex-1 bg-red-500 text-white" onClick={() => setPendingUploadFile(null)}>
                     Discard
                   </Button>
                   <Button className="flex-1 bg-green-500 text-white" onClick={confirmUpload}>
-                    Upload Photo
+                    Upload Document
                   </Button>
                 </div>
               </div>
@@ -1558,6 +1736,26 @@ const handleDelete = async () => {
                       <span className="font-medium">{format(new Date(selectedDocument.metadata.expiryDate), 'PPP')}</span>
                     </div>
                   )}
+                  {selectedDocument.metadata?.reminderDate && (
+                    <div className="flex items-center justify-between col-span-2 text-sm p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20">
+                      <div className="flex items-center gap-2">
+                        <Bell className="w-4 h-4 text-amber-500" />
+                        <span className="text-muted-foreground">Expiry Reminder:</span>
+                        <span className="font-semibold text-foreground">
+                          {format(new Date(selectedDocument.metadata.reminderDate), 'PPP p')}
+                        </span>
+                      </div>
+                      {selectedDocument.metadata?.reminderSent ? (
+                        <Badge variant="outline" className="text-xs border-green-500/40 text-green-500 bg-green-500/10">
+                          Alert Email Sent
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline" className="text-xs border-amber-500/40 text-amber-500 bg-amber-500/10">
+                          Alert Scheduled
+                        </Badge>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1608,12 +1806,14 @@ const handleDelete = async () => {
           </DialogHeader>
           {selectedDocument && (
             <form
+              key={selectedDocument.id}
               className="space-y-4"
               onSubmit={async (e) => {
                 e.preventDefault();
                 const formData = new FormData(e.currentTarget);
                 const toastId = toast.loading('Updating document...');
                 try {
+                  const reminderDateVal = formData.get('reminderDate') as string;
                   await updateDocument(selectedDocument.id, {
                     name: formData.get('name') as string,
                     category: formData.get('category') as DocumentCategory,
@@ -1622,6 +1822,7 @@ const handleDelete = async () => {
                       ...selectedDocument.metadata,
                       issuer: formData.get('issuer') as string,
                       notes: formData.get('notes') as string,
+                      reminderDate: reminderDateVal || null,
                     },
                   });
                   toast.success('Document updated successfully', { id: toastId });
@@ -1672,6 +1873,31 @@ const handleDelete = async () => {
               <div>
                 <Label htmlFor="notes">Notes</Label>
                 <Textarea id="notes" name="notes" defaultValue={selectedDocument.metadata.notes || ''} className="mt-1.5" rows={3} />
+              </div>
+              <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/5 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="reminderDate" className="text-sm font-medium flex items-center gap-1.5">
+                    <Bell className="w-3.5 h-3.5 text-amber-500" />
+                    Expiry Reminder Date
+                  </Label>
+                  {selectedDocument.metadata?.reminderSent && (
+                    <Badge variant="outline" className="text-[10px] text-green-500 border-green-500/30">
+                      Alert Sent
+                    </Badge>
+                  )}
+                </div>
+                <Input
+                  type="datetime-local"
+                  id="reminderDate"
+                  name="reminderDate"
+                  min={getLocalDateTimeInputMin()}
+                  step={60}
+                  defaultValue={toLocalDateTimeInputValue(selectedDocument.reminderDate || selectedDocument.metadata?.reminderDate)}
+                  className="mt-1"
+                />
+                <p className="text-[11px] text-muted-foreground">
+                  Choose the day, month, year, and time. We’ll email you at this local time when the reminder is due. Leave empty to turn the reminder off.
+                </p>
               </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setShowEditDialog(false)}>
